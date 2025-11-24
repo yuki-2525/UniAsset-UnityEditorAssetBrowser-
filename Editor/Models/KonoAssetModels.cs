@@ -128,7 +128,9 @@ namespace UnityEditorAssetBrowser.Models
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
         public string GetImagePath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => string.IsNullOrEmpty(Description.ImageFilename)
+                ? ""
+                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
         public string[] GetSupportedAvatars()
             => SupportedAvatars;
         public int GetBoothId()
@@ -168,7 +170,9 @@ namespace UnityEditorAssetBrowser.Models
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
         public string GetImagePath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => string.IsNullOrEmpty(Description.ImageFilename)
+                ? ""
+                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
         public string[] GetSupportedAvatars()
             => Array.Empty<string>();
         public int GetBoothId()
@@ -214,7 +218,9 @@ namespace UnityEditorAssetBrowser.Models
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
         public string GetImagePath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => string.IsNullOrEmpty(Description.ImageFilename)
+                ? ""
+                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
         public string[] GetSupportedAvatars()
             => Array.Empty<string>();
         public int GetBoothId()
@@ -260,7 +266,9 @@ namespace UnityEditorAssetBrowser.Models
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
         public string GetImagePath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => string.IsNullOrEmpty(Description.ImageFilename)
+                ? ""
+                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
         public string[] GetSupportedAvatars()
             => Array.Empty<string>();
         public int GetBoothId()
