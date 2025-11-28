@@ -171,6 +171,11 @@ namespace UnityEditorAssetBrowser.Models
         /// </summary>
         public DateTime CreatedDate { get; set; } = DateTime.MinValue;
 
+        /// <summary>
+        /// アイテムのタグ
+        /// </summary>
+        public string[] Tags { get; set; } = Array.Empty<string>();
+
         public string GetTitle()
             => Title;
         public string GetAuthor()
@@ -195,7 +200,7 @@ namespace UnityEditorAssetBrowser.Models
         public string GetCategory()
             => GetAECategoryName();
         public string[] GetTags()
-            => Array.Empty<string>();
+            => Tags;
         public DateTime GetCreatedDate()
             => TimeZoneInfo.ConvertTimeToUtc(CreatedDate, TimeZoneInfo.Local);
 
