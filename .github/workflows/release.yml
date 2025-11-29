@@ -115,9 +115,16 @@ jobs:
       - name: Update Website
         run: |
           TOKEN=${{ secrets.TOKEN }}
-          curl \
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
             -X POST \
             -H "Authorization: token $TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/yuki-2525/vpm_sakurayuki_dev/dispatches \
-            -d '{"event_type":"automatic-vpm-update","client_payload":{"env": "dev"}}'
+            -d '{"event_type":"automatic-vpm-update","client_payload":{"env": "dev"}}')
+          
+          if [ "$response" -ne 204 ]; then
+            echo "Failed to trigger workflow. HTTP status code: $response"
+            exit 1
+          else
+            echo "Successfully triggered workflow. HTTP status code: $response"
+          fi
