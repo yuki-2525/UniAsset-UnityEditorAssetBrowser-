@@ -34,6 +34,36 @@ namespace UnityEditorAssetBrowser.Services
             return destPath;
         }
 
+        /// <summary>
+        /// 一時フォルダ内の古いパッケージファイルを削除する
+        /// </summary>
+        public static void Cleanup()
+        {
+            string tempDir = Path.Combine(Path.GetTempPath(), "UnityEditorAssetBrowser");
+            if (!Directory.Exists(tempDir)) return;
+
+            try
+            {
+                var files = Directory.GetFiles(tempDir, "*_modified_*.unitypackage");
+                foreach (var file in files)
+                {
+                    try
+                    {
+                        // 単純に削除を試みる。使用中の場合は例外が発生してスキップされる。
+                        File.Delete(file);
+                    }
+                    catch
+                    {
+                        // 無視
+                    }
+                }
+            }
+            catch
+            {
+                // 無視
+            }
+        }
+
         private static void ModifyTarStream(Stream input, Stream output, string category)
         {
             byte[] headerBuffer = new byte[512];
@@ -86,7 +116,7 @@ namespace UnityEditorAssetBrowser.Services
                         
                         if (path.Length > 7 && (path[6] == '/' || path[6] == '\\'))
                         {
-                             path = path.Insert(7, $"{category}/");
+                            path = path.Insert(7, $"{category}/");
                         }
                         else if (path == "Assets")
                         {

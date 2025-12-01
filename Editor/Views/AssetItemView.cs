@@ -266,23 +266,39 @@ namespace UnityEditorAssetBrowser.Views
             GUILayout.BeginHorizontal();
             GUILayout.Label(string.Join("/", Path.GetDirectoryName(package).Split(Path.DirectorySeparatorChar).TakeLast(2)) + "/" + Path.GetFileName(package));
 
-            if (GUILayout.Button("インポート", GUILayout.Width(100)))
-            {
-                // フォルダサムネイル生成設定を取得
-                bool generateFolderThumbnail = EditorPrefs.GetBool(
-                    "UnityEditorAssetBrowser_GenerateFolderThumbnail",
-                    true
-                );
+            // ボタンの矩形を確保
+            var buttonContent = new GUIContent("インポート");
+            var buttonRect = GUILayoutUtility.GetRect(buttonContent, GUI.skin.button, GUILayout.Width(100));
 
-                if (generateFolderThumbnail)
+            // 右クリックメニューの表示
+            if (Event.current.type == EventType.ContextClick && buttonRect.Contains(Event.current.mousePosition))
+            {
+                var menu = new GenericMenu();
+                menu.AddItem(new GUIContent("カテゴリフォルダ下にインポート"), false, () => 
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true));
+                menu.AddItem(new GUIContent("直接インポート"), false, () => 
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false));
+                menu.ShowAsContext();
+                Event.current.Use();
+            }
+
+            // 右クリックイベントがボタンに干渉しないように制御
+            // 右クリック（button 1）のイベント中はGUI.Buttonを実行せず、描画のみ行う
+            bool isRightClick = Event.current.button == 1 && buttonRect.Contains(Event.current.mousePosition);
+            
+            if (isRightClick)
+            {
+                if (Event.current.type == EventType.Repaint)
                 {
-                    // サムネイルも生成する
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category);
+                    GUI.skin.button.Draw(buttonRect, buttonContent, false, false, false, false);
                 }
-                else
+            }
+            else
+            {
+                // 左クリック（通常のボタン動作）
+                if (GUI.Button(buttonRect, buttonContent))
                 {
-                    // 通常のUnityパッケージインポートのみ
-                    AssetDatabase.ImportPackage(package, true);
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, null);
                 }
             }
 

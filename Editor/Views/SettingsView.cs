@@ -533,6 +533,7 @@ namespace UnityEditorAssetBrowser.Views
                 );
 
                 EditorGUILayout.HelpBox("・インポート時間が長くなる可能性があります\n・前提アセットがある場合に正常に動作しない可能性があります", MessageType.Warning);
+                EditorGUILayout.HelpBox("この設定に関わらず、右クリックメニューからインポート方法を選択できます", MessageType.Info);
 
                 if (newValue != importToCategoryFolder)
                 {
