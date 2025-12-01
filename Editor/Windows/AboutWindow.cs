@@ -16,6 +16,12 @@ namespace UnityEditorAssetBrowser.Windows
         private const string DeveloperXUrl = "https://x.com/sakurayuki_dev";
         private const string FanboxUrl = "https://sakurayuki-dev.fanbox.cc/";
 
+        // 支援者様リスト
+        private readonly string[] _supporters = new string[]
+        {
+            "シャル様"
+        };
+
         public static void ShowWindow()
         {
             var w = GetWindow<AboutWindow>(true, "このソフトについて", true);
@@ -36,7 +42,7 @@ namespace UnityEditorAssetBrowser.Windows
                 var version = VersionUpdateService.External.GetVersion();
                 if (!string.IsNullOrEmpty(version)) _version = version;
             }
-            catch (System.Exception ex)
+            catch (System.Exception)
             {
                 
             }
@@ -96,14 +102,24 @@ namespace UnityEditorAssetBrowser.Windows
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.LabelField("みなさんの支援が開発のモチベーションとなります！", EditorStyles.wordWrappedLabel);
 
+            DrawSupporters();
+
             GUILayout.FlexibleSpace();
 
-            if (GUILayout.Button("閉じる", GUILayout.Height(28)))
-            {
-                Close();
-            }
-
             EditorGUILayout.EndScrollView();
+        }
+
+        private void DrawSupporters()
+        {
+            EditorGUILayout.Space(10);
+            EditorGUILayout.LabelField("Special Thanks (支援者のみなさま):", EditorStyles.boldLabel);
+            
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            
+            string text = string.Join(", ", _supporters);
+            EditorGUILayout.LabelField(text, EditorStyles.wordWrappedLabel);
+            
+            EditorGUILayout.EndVertical();
         }
     }
 }
