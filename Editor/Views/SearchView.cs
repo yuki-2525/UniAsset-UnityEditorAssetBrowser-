@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
 using UnityEditorAssetBrowser.ViewModels;
@@ -38,13 +39,17 @@ namespace UnityEditorAssetBrowser.Views
             // タブが変更された場合の処理
             CheckTabChange();
 
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
             // 基本検索フィールド
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("検索:", GUILayout.Width(60));
+            var searchLabel = "検索:";
+            var searchLabelWidth = GUIStyleManager.Label.CalcSize(new GUIContent(searchLabel)).x + 5;
+            EditorGUILayout.LabelField(searchLabel, GUIStyleManager.Label, GUILayout.Width(searchLabelWidth));
+            
             var newSearchQuery = EditorGUILayout.TextField(
-                _searchViewModel.SearchCriteria.SearchQuery
+                _searchViewModel.SearchCriteria.SearchQuery,
+                GUIStyleManager.TextField
             );
             if (newSearchQuery != _searchViewModel.SearchCriteria.SearchQuery)
             {
@@ -55,10 +60,13 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             // 詳細検索のトグル
+            var advancedSearchLabel = "詳細検索";
+            var advancedSearchWidth = GUIStyleManager.Label.CalcSize(new GUIContent(advancedSearchLabel)).x + 25; // Toggle needs more space
             var newShowAdvancedSearch = EditorGUILayout.ToggleLeft(
-                "詳細検索",
+                advancedSearchLabel,
                 _searchViewModel.SearchCriteria.ShowAdvancedSearch,
-                GUILayout.Width(100)
+                GUIStyleManager.Label,
+                GUILayout.Width(advancedSearchWidth)
             );
             if (newShowAdvancedSearch != _searchViewModel.SearchCriteria.ShowAdvancedSearch)
             {
@@ -68,7 +76,9 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             // クリアボタン
-            if (GUILayout.Button("クリア", GUILayout.Width(60)))
+            var clearLabel = "クリア";
+            var clearWidth = GUIStyleManager.Button.CalcSize(new GUIContent(clearLabel)).x + 10;
+            if (GUILayout.Button(clearLabel, GUIStyleManager.Button, GUILayout.Width(clearWidth)))
             {
                 _searchViewModel.ClearSearchCriteria();
                 _paginationViewModel.ResetPage();
@@ -77,7 +87,9 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             // ソートボタン
-            if (GUILayout.Button("▼ 表示順", GUILayout.Width(80)))
+            var sortLabel = "▼ 表示順";
+            var sortWidth = GUIStyleManager.Button.CalcSize(new GUIContent(sortLabel)).x + 10;
+            if (GUILayout.Button(sortLabel, GUIStyleManager.Button, GUILayout.Width(sortWidth)))
             {
                 var menu = new GenericMenu();
                 menu.AddItem(
@@ -160,13 +172,20 @@ namespace UnityEditorAssetBrowser.Views
             if (_searchViewModel.SearchCriteria.ShowAdvancedSearch)
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
+
+                float labelWidth = 100f; // Default width, maybe scale it?
+                // Let's calculate max label width for alignment if we want to be fancy, but fixed width is probably fine for now if it's wide enough.
+                // "対応アバター:" is the longest label.
+                var maxLabel = "対応アバター:";
+                labelWidth = Mathf.Max(100f, GUIStyleManager.Label.CalcSize(new GUIContent(maxLabel)).x + 5);
 
                 // タイトル検索
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("タイトル:", GUILayout.Width(100));
+                EditorGUILayout.LabelField("タイトル:", GUIStyleManager.Label, GUILayout.Width(labelWidth));
                 var newTitleSearch = EditorGUILayout.TextField(
-                    _searchViewModel.SearchCriteria.TitleSearch
+                    _searchViewModel.SearchCriteria.TitleSearch,
+                    GUIStyleManager.TextField
                 );
                 if (newTitleSearch != _searchViewModel.SearchCriteria.TitleSearch)
                 {
@@ -179,9 +198,10 @@ namespace UnityEditorAssetBrowser.Views
 
                 // 作者名検索
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("作者名:", GUILayout.Width(100));
+                EditorGUILayout.LabelField("作者名:", GUIStyleManager.Label, GUILayout.Width(labelWidth));
                 var newAuthorSearch = EditorGUILayout.TextField(
-                    _searchViewModel.SearchCriteria.AuthorSearch
+                    _searchViewModel.SearchCriteria.AuthorSearch,
+                    GUIStyleManager.TextField
                 );
                 if (newAuthorSearch != _searchViewModel.SearchCriteria.AuthorSearch)
                 {
@@ -196,9 +216,10 @@ namespace UnityEditorAssetBrowser.Views
                 if (_paginationViewModel.SelectedTab != 0)
                 {
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("カテゴリ:", GUILayout.Width(100));
+                    EditorGUILayout.LabelField("カテゴリ:", GUIStyleManager.Label, GUILayout.Width(labelWidth));
                     var newCategorySearch = EditorGUILayout.TextField(
-                        _searchViewModel.SearchCriteria.CategorySearch
+                        _searchViewModel.SearchCriteria.CategorySearch,
+                        GUIStyleManager.TextField
                     );
                     if (newCategorySearch != _searchViewModel.SearchCriteria.CategorySearch)
                     {
@@ -214,9 +235,10 @@ namespace UnityEditorAssetBrowser.Views
                 if (_paginationViewModel.SelectedTab == 1)
                 {
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("対応アバター:", GUILayout.Width(100));
+                    EditorGUILayout.LabelField("対応アバター:", GUIStyleManager.Label, GUILayout.Width(labelWidth));
                     var newSupportedAvatarsSearch = EditorGUILayout.TextField(
-                        _searchViewModel.SearchCriteria.SupportedAvatarsSearch
+                        _searchViewModel.SearchCriteria.SupportedAvatarsSearch,
+                        GUIStyleManager.TextField
                     );
                     if (
                         newSupportedAvatarsSearch
@@ -234,9 +256,12 @@ namespace UnityEditorAssetBrowser.Views
 
                 // タグ検索
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("タグ:", GUILayout.Width(100));
+                EditorGUILayout.LabelField("タグ:", GUIStyleManager.Label, GUILayout.Width(labelWidth));
 
-                var newTagsSearch = EditorGUILayout.TextField(_searchViewModel.SearchCriteria.TagsSearch);
+                var newTagsSearch = EditorGUILayout.TextField(
+                    _searchViewModel.SearchCriteria.TagsSearch,
+                    GUIStyleManager.TextField
+                );
                 if (newTagsSearch != _searchViewModel.SearchCriteria.TagsSearch)
                 {
                     _searchViewModel.SearchCriteria.TagsSearch = newTagsSearch;
@@ -249,9 +274,12 @@ namespace UnityEditorAssetBrowser.Views
 
                 // メモ検索
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("メモ:", GUILayout.Width(100));
+                EditorGUILayout.LabelField("メモ:", GUIStyleManager.Label, GUILayout.Width(labelWidth));
 
-                var newMemoSearch = EditorGUILayout.TextField(_searchViewModel.SearchCriteria.MemoSearch);
+                var newMemoSearch = EditorGUILayout.TextField(
+                    _searchViewModel.SearchCriteria.MemoSearch,
+                    GUIStyleManager.TextField
+                );
                 if (newMemoSearch != _searchViewModel.SearchCriteria.MemoSearch)
                 {
                     _searchViewModel.SearchCriteria.MemoSearch = newMemoSearch;
@@ -287,12 +315,12 @@ namespace UnityEditorAssetBrowser.Views
             GUILayout.FlexibleSpace();
 
             // 追加: このソフトについてボタン
-            if (GUILayout.Button("このソフトについて", GUILayout.Width(140)))
+            if (GUILayout.Button("このソフトについて", GUIStyleManager.Button))
             {
                 AboutWindow.ShowWindow();
             }
 
-            if (GUILayout.Button("設定", GUILayout.Width(100)))
+            if (GUILayout.Button("設定", GUIStyleManager.Button))
             {
                 SettingsWindow.ShowWindow(
                     _assetBrowserViewModel,
@@ -301,7 +329,7 @@ namespace UnityEditorAssetBrowser.Views
                 );
             }
 
-            if (GUILayout.Button("更新", GUILayout.Width(100)))
+            if (GUILayout.Button("更新", GUIStyleManager.Button))
             {
                 // データベースを更新
                 DatabaseService.LoadAEDatabase();

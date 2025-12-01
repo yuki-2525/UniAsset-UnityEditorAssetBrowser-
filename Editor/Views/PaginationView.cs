@@ -2,6 +2,7 @@
 
 #nullable enable
 
+using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.ViewModels;
 using UnityEngine;
 
@@ -51,7 +52,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawPreviousButton()
         {
-            if (GUILayout.Button("前へ", GUILayout.Width(100)))
+            if (GUILayout.Button("前へ", GUIStyleManager.Button, GUILayout.Width(100)))
             {
                 _paginationViewModel.MoveToPreviousPage();
             }
@@ -70,7 +71,7 @@ namespace UnityEditorAssetBrowser.Views
             );
             
             int totalPages = _paginationViewModel.GetTotalPages(currentItems);
-            GUILayout.Label($"ページ {_paginationViewModel.CurrentPage + 1} / {totalPages}");
+            GUILayout.Label($"ページ {_paginationViewModel.CurrentPage + 1} / {totalPages}", GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -78,7 +79,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawNextButton()
         {
-            if (GUILayout.Button("次へ", GUILayout.Width(100)))
+            if (GUILayout.Button("次へ", GUIStyleManager.Button, GUILayout.Width(100)))
             {
                 var currentItems = _paginationViewModel.GetCurrentTabItems(
                     () => _assetBrowserViewModel.GetFilteredAvatars(),

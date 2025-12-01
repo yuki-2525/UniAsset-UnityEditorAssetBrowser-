@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
+using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Services;
 using UnityEngine;
 
@@ -70,6 +71,14 @@ namespace UnityEditorAssetBrowser.Views
         private const string PREFS_KEY_GENERATE_FOLDER_THUMBNAIL = "UnityEditorAssetBrowser_GenerateFolderThumbnail";
         private const string PREFS_KEY_EXCLUDE_FOLDERS = "UnityEditorAssetBrowser_ExcludeFolders";
         private const string PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER = "UnityEditorAssetBrowser_ImportToCategoryFolder";
+        private const string PREFS_KEY_ICON_SIZE = "UnityEditorAssetBrowser_IconSize";
+        private const string PREFS_KEY_FONT_SIZE = "UnityEditorAssetBrowser_FontSize";
+
+        // 表示サイズ設定
+        private bool _showDisplaySizeSettings = false;
+        private readonly string[] _sizeOptions = new[] { "小", "中", "大" };
+        private readonly int[] _iconSizes = new[] { 100, 150, 200 };
+        private readonly int[] _fontSizes = new[] { 10, 12, 14 };
 
         // 初期設定リスト（abc順）
         private static readonly List<string> _allDefaultExcludeFolders = ExcludeFolderService.GetAllDefaultExcludeFolders()
@@ -195,12 +204,13 @@ namespace UnityEditorAssetBrowser.Views
             _showDatabaseSettings = EditorGUILayout.Foldout(
                 _showDatabaseSettings,
                 "データベース設定",
-                true
+                true,
+                GUIStyleManager.Foldout
             );
 
             if (_showDatabaseSettings)
             {
-                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                 DrawDatabasePathField(
                     "AE Database Path:",
                     DatabaseService.GetAEDatabasePath(),
@@ -223,12 +233,57 @@ namespace UnityEditorAssetBrowser.Views
                 EditorGUILayout.EndVertical();
             }
 
+            // 表示サイズ設定セクション
+            EditorGUILayout.Space(10);
+            _showDisplaySizeSettings = EditorGUILayout.Foldout(
+                _showDisplaySizeSettings,
+                "表示サイズ設定",
+                true,
+                GUIStyleManager.Foldout
+            );
+
+            if (_showDisplaySizeSettings)
+            {
+                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
+
+                // アイコンサイズ設定
+                int currentIconSize = EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 100);
+                int iconSizeIndex = Array.IndexOf(_iconSizes, currentIconSize);
+                if (iconSizeIndex == -1) iconSizeIndex = 1; // デフォルトは中(100)
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("アイコンサイズ:", GUIStyleManager.Label, GUILayout.Width(120));
+                int newIconSizeIndex = EditorGUILayout.Popup(iconSizeIndex, _sizeOptions, GUIStyleManager.Popup, GUILayout.Width(100));
+                if (newIconSizeIndex != iconSizeIndex)
+                {
+                    EditorPrefs.SetInt(PREFS_KEY_ICON_SIZE, _iconSizes[newIconSizeIndex]);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                // 文字サイズ設定
+                int currentFontSize = EditorPrefs.GetInt(PREFS_KEY_FONT_SIZE, 12);
+                int fontSizeIndex = Array.IndexOf(_fontSizes, currentFontSize);
+                if (fontSizeIndex == -1) fontSizeIndex = 1; // デフォルトは中(12)
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("文字サイズ:", GUIStyleManager.Label, GUILayout.Width(120));
+                int newFontSizeIndex = EditorGUILayout.Popup(fontSizeIndex, _sizeOptions, GUIStyleManager.Popup, GUILayout.Width(100));
+                if (newFontSizeIndex != fontSizeIndex)
+                {
+                    EditorPrefs.SetInt(PREFS_KEY_FONT_SIZE, _fontSizes[newFontSizeIndex]);
+                }
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.EndVertical();
+            }
+
             // AEのカテゴリ一覧セクション
             EditorGUILayout.Space(10);
             _showCategorySettings = EditorGUILayout.Foldout(
                 _showCategorySettings,
                 "AvatarExplorer カテゴリ設定",
-                true
+                true,
+                GUIStyleManager.Foldout
             );
 
             if (_showCategorySettings)
@@ -236,7 +291,7 @@ namespace UnityEditorAssetBrowser.Views
                 var aeDatabase = DatabaseService.GetAEDatabase();
                 if (aeDatabase == null)
                 {
-                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                     EditorGUILayout.HelpBox("これはAvatar Explorer用の設定です", MessageType.Info);
                     EditorGUILayout.EndVertical();
                 }
@@ -245,7 +300,7 @@ namespace UnityEditorAssetBrowser.Views
                     _categoryScrollPosition = EditorGUILayout.BeginScrollView(
                         _categoryScrollPosition
                     );
-                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
                     // 指定された順序のカテゴリを表示
                     foreach (var category in _orderedCategories)
@@ -256,22 +311,23 @@ namespace UnityEditorAssetBrowser.Views
                         
                         if (items.Any())
                         {
-                            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                            EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                             EditorGUILayout.BeginHorizontal();
                             EditorGUILayout.LabelField(
                                 category,
-                                EditorStyles.boldLabel,
+                                GUIStyleManager.BoldLabel,
                                 GUILayout.Width(200)
                             );
-                            EditorGUILayout.LabelField($"{items.Count}個のアイテム");
+                            EditorGUILayout.LabelField($"{items.Count}個のアイテム", GUIStyleManager.Label);
                             EditorGUILayout.EndHorizontal();
 
                             // アセットタイプの選択
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField("アセットタイプ:", GUILayout.Width(100));
+                            EditorGUILayout.LabelField("アセットタイプ:", GUIStyleManager.Label, GUILayout.Width(100));
                             var newValue = EditorGUILayout.Popup(
                                 _categoryAssetTypes[category],
                                 _assetTypes,
+                                GUIStyleManager.Popup,
                                 GUILayout.Width(200)
                             );
                             if (newValue != _categoryAssetTypes[category])
@@ -297,23 +353,24 @@ namespace UnityEditorAssetBrowser.Views
                             .Where(item => item.GetAECategoryName() == category)
                             .ToList();
                         
-                        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                        EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                         EditorGUILayout.BeginHorizontal();
                         EditorGUILayout.LabelField(
                             category,
-                            EditorStyles.boldLabel,
+                            GUIStyleManager.BoldLabel,
                             GUILayout.Width(200)
                         );
-                        EditorGUILayout.LabelField($"{items.Count}個のアイテム");
+                        EditorGUILayout.LabelField($"{items.Count}個のアイテム", GUIStyleManager.Label);
                         EditorGUILayout.EndHorizontal();
 
                         // アセットタイプの選択
                         EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField("アセットタイプ:", GUILayout.Width(100));
+                        EditorGUILayout.LabelField("アセットタイプ:", GUIStyleManager.Label, GUILayout.Width(100));
 
                         var newValue = EditorGUILayout.Popup(
                             _categoryAssetTypes[category],
                             _assetTypes,
+                            GUIStyleManager.Popup,
                             GUILayout.Width(200)
                         );
 
@@ -338,12 +395,13 @@ namespace UnityEditorAssetBrowser.Views
             _showFolderThumbnailSettings = EditorGUILayout.Foldout(
                 _showFolderThumbnailSettings,
                 "フォルダサムネイル設定",
-                true
+                true,
+                GUIStyleManager.Foldout
             );
 
             if (_showFolderThumbnailSettings)
             {
-                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
                 // フォルダサムネイルを表示する
                 bool showFolderThumbnail = EditorPrefs.GetBool(
@@ -353,7 +411,8 @@ namespace UnityEditorAssetBrowser.Views
 
                 bool newShowFolderThumbnail = EditorGUILayout.ToggleLeft(
                     "フォルダサムネイルを表示する",
-                    showFolderThumbnail
+                    showFolderThumbnail,
+                    GUIStyleManager.Label
                 );
 
                 bool newGenerateFolderThumbnail = false;
@@ -379,7 +438,8 @@ namespace UnityEditorAssetBrowser.Views
                 EditorGUI.BeginDisabledGroup(newShowFolderThumbnail); // ONの間はグレーアウト
                 newGenerateFolderThumbnail = EditorGUILayout.ToggleLeft(
                     "フォルダサムネイルを生成する",
-                    generateFolderThumbnail
+                    generateFolderThumbnail,
+                    GUIStyleManager.Label
                 );
                 EditorGUI.EndDisabledGroup();
 
@@ -414,17 +474,18 @@ namespace UnityEditorAssetBrowser.Views
                 _showDefaultExcludeFolders = EditorGUILayout.Foldout(
                     _showDefaultExcludeFolders,
                     "初期設定除外フォルダ（ON/OFF）",
-                    true
+                    true,
+                    GUIStyleManager.Foldout
                 );
 
                 if (_showDefaultExcludeFolders)
                 {
-                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                     foreach (var def in _allDefaultExcludeFolders)
                     {
                         EditorGUILayout.BeginHorizontal();
                         bool isOn = _enabledDefaultExcludeFolders.Contains(def);
-                        bool newIsOn = EditorGUILayout.ToggleLeft(def, isOn);
+                        bool newIsOn = EditorGUILayout.ToggleLeft(def, isOn, GUIStyleManager.Label);
                         if (newIsOn != isOn)
                         {
                             if (newIsOn)
@@ -444,13 +505,14 @@ namespace UnityEditorAssetBrowser.Views
                 }
 
                 // ユーザー追加領域
-                EditorGUILayout.LabelField("ユーザー追加除外フォルダ", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField("ユーザー追加除外フォルダ", GUIStyleManager.BoldLabel);
                 EditorGUILayout.HelpBox("フォルダ名を指定することで、そのフォルダのサムネイル表示を無効にできます。\n正規表現を利用することが可能です。", MessageType.Info);
                 EditorGUILayout.BeginHorizontal();
                 GUI.SetNextControlName("NewExcludeFolderField");
                 _newExcludeFolder = EditorGUILayout.TextField(
                     "新しい除外フォルダ",
-                    _newExcludeFolder
+                    _newExcludeFolder,
+                    GUIStyleManager.TextField
                 );
 
                 bool shouldAdd = false;
@@ -462,7 +524,7 @@ namespace UnityEditorAssetBrowser.Views
                     Event.current.Use();
                 }
 
-                if (GUILayout.Button("追加", GUILayout.Width(60)))
+                if (GUILayout.Button("追加", GUIStyleManager.Button, GUILayout.Width(60)))
                 {
                     shouldAdd = true;
                 }
@@ -494,11 +556,11 @@ namespace UnityEditorAssetBrowser.Views
 
                 for (int i = 0; i < _userExcludeFolders.Count; i++)
                 {
-                    EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                    EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(_userExcludeFolders[i]);
+                    EditorGUILayout.LabelField(_userExcludeFolders[i], GUIStyleManager.Label);
 
-                    if (GUILayout.Button("削除", GUILayout.Width(60)))
+                    if (GUILayout.Button("削除", GUIStyleManager.Button, GUILayout.Width(60)))
                     {
                         _userExcludeFolders.RemoveAt(i);
                         SaveExcludeFoldersAndCombined();
@@ -519,17 +581,19 @@ namespace UnityEditorAssetBrowser.Views
             _showImportSettings = EditorGUILayout.Foldout(
                 _showImportSettings,
                 "インポート設定",
-                true
+                true,
+                GUIStyleManager.Foldout
             );
 
             if (_showImportSettings)
             {
-                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
                 bool importToCategoryFolder = EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
                 bool newValue = EditorGUILayout.ToggleLeft(
                     "UnityPackageをカテゴリ名のフォルダの下にインポート",
-                    importToCategoryFolder
+                    importToCategoryFolder,
+                    GUIStyleManager.Label
                 );
 
                 EditorGUILayout.HelpBox("・インポート時間が長くなる可能性があります\n・前提アセットがある場合に正常に動作しない可能性があります", MessageType.Warning);
@@ -553,22 +617,22 @@ namespace UnityEditorAssetBrowser.Views
         private void DrawDatabasePathField(string label, string path, Action<string> onPathChanged)
         {
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(label, GUILayout.Width(120));
+            EditorGUILayout.LabelField(label, GUIStyleManager.Label, GUILayout.Width(120));
 
             // パスを編集不可のテキストフィールドとして表示
             EditorGUI.BeginDisabledGroup(true);
-            EditorGUILayout.TextField(path);
+            EditorGUILayout.TextField(path, GUIStyleManager.TextField);
             EditorGUI.EndDisabledGroup();
 
             // 削除ボタン
-            if (!string.IsNullOrEmpty(path) && GUILayout.Button("削除", GUILayout.Width(60)))
+            if (!string.IsNullOrEmpty(path) && GUILayout.Button("削除", GUIStyleManager.Button, GUILayout.Width(60)))
             {
                 onPathChanged("");
                 if (label == "AE Database Path:") InitializeCategoryAssetTypes();
             }
 
             // 参照ボタン
-            if (GUILayout.Button("参照", GUILayout.Width(60)))
+            if (GUILayout.Button("参照", GUIStyleManager.Button, GUILayout.Width(60)))
             {
                 var selectedPath = EditorUtility.OpenFolderPanel(
                     $"Select {label} Directory",

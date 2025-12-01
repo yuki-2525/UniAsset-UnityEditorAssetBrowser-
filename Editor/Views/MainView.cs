@@ -4,6 +4,7 @@
 
 using System.Collections.Generic;
 using UnityEditor;
+using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
 using UnityEditorAssetBrowser.ViewModels;
@@ -117,7 +118,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawTabBar()
         {
-            var newTab = GUILayout.Toolbar(_paginationViewModel.SelectedTab, Tabs);
+            var newTab = GUILayout.Toolbar(_paginationViewModel.SelectedTab, Tabs, GUIStyleManager.TabButton);
             if (newTab != _paginationViewModel.SelectedTab)
             {
                 _paginationViewModel.SelectedTab = newTab;
@@ -130,7 +131,7 @@ namespace UnityEditorAssetBrowser.Views
 
         private void DrawSearchResult(List<IDatabaseItem> totalItems)
         {
-            EditorGUILayout.LabelField($"検索結果: {totalItems.Count}件");
+            EditorGUILayout.LabelField($"検索結果: {totalItems.Count}件", GUIStyleManager.Label);
             EditorGUILayout.Space(10);
         }
 
