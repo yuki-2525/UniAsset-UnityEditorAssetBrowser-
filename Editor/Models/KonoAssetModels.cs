@@ -178,7 +178,7 @@ namespace UnityEditorAssetBrowser.Models
         public int GetBoothId()
             => Description.BoothItemId ?? -1;
         public string GetCategory()
-            => "";
+            => "アバター";
         public string[] GetTags()
             => Description.Tags;
         public DateTime GetCreatedDate()

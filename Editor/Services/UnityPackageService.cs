@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -62,15 +63,37 @@ namespace UnityEditorAssetBrowser.Services
         /// <param name="packagePath">パッケージパス</param>
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="category">カテゴリ</param>
-        public static void ImportPackageAndSetThumbnails(string packagePath, string imagePath, string category)
+        public static async void ImportPackageAndSetThumbnails(string packagePath, string imagePath, string category)
         {
             var beforeFolders = GetAssetFolders();
 
             try
             {
                 bool importToCategoryFolder = EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
+                string pathToImport = packagePath;
+                bool isModified = false;
+
+                if (importToCategoryFolder && !string.IsNullOrEmpty(category))
+                {
+                    try
+                    {
+                        EditorUtility.DisplayProgressBar("Preparing Package", "Modifying package structure...", 0.5f);
+                        pathToImport = await UnityPackageModifier.CreateModifiedPackageAsync(packagePath, category);
+                        isModified = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[UnityPackageService] Failed to modify package: {ex.Message}");
+                        pathToImport = packagePath;
+                        isModified = false;
+                    }
+                    finally
+                    {
+                        EditorUtility.ClearProgressBar();
+                    }
+                }
                 
-                AssetDatabase.ImportPackage(packagePath, true);
+                AssetDatabase.ImportPackage(pathToImport, true);
 
                 // インポート完了後の処理を設定
                 if (_importCompletedHandler != null)
@@ -82,6 +105,11 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     try
                     {
+                        if (isModified && pathToImport != packagePath && File.Exists(pathToImport))
+                        {
+                            try { File.Delete(pathToImport); } catch { }
+                        }
+
                         // アセットデータベースを更新
                         AssetDatabase.Refresh();
 
@@ -99,81 +127,6 @@ namespace UnityEditorAssetBrowser.Services
                         else
                         {
                             Debug.LogWarning("[UnityPackageService] 新規フォルダが見つかりませんでした");
-                        }
-
-                        if (importToCategoryFolder && !string.IsNullOrEmpty(category) && newFolders.Any())
-                        {
-                            // カテゴリフォルダのパスを設定
-                            string categoryPath = Path.Combine("Assets", category);
-
-                            // カテゴリフォルダが実際に存在するか確認（より厳密な方法）
-                            bool folderExists = AssetDatabase.IsValidFolder(categoryPath);
-
-                            if (!folderExists)
-                            {
-                                // 同名のアセットが存在するか確認
-                                string assetGuid = AssetDatabase.AssetPathToGUID(categoryPath);
-                                if (!string.IsNullOrEmpty(assetGuid))
-                                {
-                                    Debug.LogError($"[UnityPackageService] 同名のアセットが既に存在します: {categoryPath}");
-                                    return;
-                                }
-
-                                string result = AssetDatabase.CreateFolder("Assets", category);
-                                if (string.IsNullOrEmpty(result))
-                                {
-                                    Debug.LogError($"[UnityPackageService] カテゴリフォルダの作成に失敗しました: {categoryPath}");
-                                    return;
-                                }
-
-                                AssetDatabase.Refresh();
-                            }
-
-                            // 新しいフォルダをカテゴリフォルダに移動
-                            foreach (var folder in newFolders)
-                            {
-                                // フォルダがカテゴリフォルダの配下または親にカテゴリフォルダを含む場合はスキップ
-                                if (folder.StartsWith(categoryPath + "/") || folder.Contains($"/{category}/"))
-                                    continue;
-
-                                if (Directory.Exists(folder))
-                                {
-                                    string folderName = Path.GetFileName(folder);
-                                    string newPath = Path.Combine(categoryPath, folderName);
-                                    
-                                    // 移動先に同名のフォルダが存在する場合、その中に移動
-                                    if (Directory.Exists(newPath))
-                                    {
-                                        // フォルダ内の全アセットを移動
-                                        string[] assets = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories);
-
-                                        foreach (var asset in assets)
-                                        {
-                                            if (Path.GetExtension(asset) != ".meta")
-                                            {
-                                                string relativePath = Path.GetRelativePath(folder, asset);
-                                                string targetPath = Path.Combine(newPath, relativePath);
-                                                string targetDir = Path.GetDirectoryName(targetPath);
-
-                                                if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
-
-                                                string result = AssetDatabase.MoveAsset(asset, targetPath);
-                                                if (!string.IsNullOrEmpty(result)) Debug.LogError($"[UnityPackageService] アセット移動エラー: {result}");
-                                            }
-                                        }
-                                        
-                                        // 空になったフォルダを削除
-                                        AssetDatabase.DeleteAsset(folder);
-                                    }
-                                    else
-                                    {
-                                        // フォルダを移動
-                                        string result = AssetDatabase.MoveAsset(folder, newPath);
-                                        if (!string.IsNullOrEmpty(result)) Debug.LogError($"[UnityPackageService] フォルダ移動エラー: {result}");
-                                    }
-                                }
-                            }
-                            AssetDatabase.Refresh();
                         }
                     }
                     catch (Exception ex)
