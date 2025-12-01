@@ -118,7 +118,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawTabBar()
         {
-            var newTab = GUILayout.Toolbar(_paginationViewModel.SelectedTab, Tabs, GUIStyleManager.TabButton);
+            var newTab = GUILayout.SelectionGrid(_paginationViewModel.SelectedTab, Tabs, Tabs.Length, GUIStyleManager.TabButton);
             if (newTab != _paginationViewModel.SelectedTab)
             {
                 _paginationViewModel.SelectedTab = newTab;

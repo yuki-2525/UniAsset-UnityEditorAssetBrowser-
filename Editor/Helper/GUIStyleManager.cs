@@ -32,12 +32,12 @@ namespace UnityEditorAssetBrowser.Helper
         /// <summary>
         /// 現在設定されているアイコンサイズ
         /// </summary>
-        public static int IconSize => EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 150);
+        public static int IconSize => EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 210);
 
         /// <summary>
         /// 現在設定されているフォントサイズ
         /// </summary>
-        public static int FontSize => EditorPrefs.GetInt(PREFS_KEY_FONT_SIZE, 12);
+        public static int FontSize => EditorPrefs.GetInt(PREFS_KEY_FONT_SIZE, 13);
 
         /// <summary>
         /// スタイルが現在のフォントサイズと一致しているか確認し、必要ならリセットする
@@ -184,7 +184,8 @@ namespace UnityEditorAssetBrowser.Helper
                 _tabButtonStyle ??= new GUIStyle(GUI.skin.button)
                 {
                     fontSize = _currentFontSize,
-                    fixedHeight = 0,
+                    fixedHeight = _currentFontSize + 12,
+                    alignment = TextAnchor.MiddleCenter
                 };
                 return _tabButtonStyle;
             }

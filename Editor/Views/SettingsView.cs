@@ -18,6 +18,12 @@ namespace UnityEditorAssetBrowser.Views
     {
         private readonly Action<string> _onAEDatabasePathChanged;
         private readonly Action<string> _onKADatabasePathChanged;
+        
+        /// <summary>
+        /// 設定が変更された時に発生するイベント
+        /// </summary>
+        public event Action OnSettingsChanged;
+
         private Vector2 _categoryScrollPosition;
         private bool _showDatabaseSettings;
         private bool _showCategorySettings;
@@ -76,9 +82,8 @@ namespace UnityEditorAssetBrowser.Views
 
         // 表示サイズ設定
         private bool _showDisplaySizeSettings = false;
-        private readonly string[] _sizeOptions = new[] { "小", "中", "大" };
-        private readonly int[] _iconSizes = new[] { 100, 150, 200 };
-        private readonly int[] _fontSizes = new[] { 10, 12, 14 };
+        private readonly int[] _iconSizes = new[] { 90, 120, 150, 180, 210, 240, 270, 300, 330};
+        private readonly int[] _fontSizes = new[] { 10, 11, 12, 13, 14, 15, 16 };
 
         // 初期設定リスト（abc順）
         private static readonly List<string> _allDefaultExcludeFolders = ExcludeFolderService.GetAllDefaultExcludeFolders()
@@ -247,30 +252,34 @@ namespace UnityEditorAssetBrowser.Views
                 EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
                 // アイコンサイズ設定
-                int currentIconSize = EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 100);
-                int iconSizeIndex = Array.IndexOf(_iconSizes, currentIconSize);
-                if (iconSizeIndex == -1) iconSizeIndex = 1; // デフォルトは中(100)
+                int currentIconSize = EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 210);
+                int iconSizeIndex = GetClosestIndex(_iconSizes, currentIconSize);
 
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField("アイコンサイズ:", GUIStyleManager.Label, GUILayout.Width(120));
-                int newIconSizeIndex = EditorGUILayout.Popup(iconSizeIndex, _sizeOptions, GUIStyleManager.Popup, GUILayout.Width(100));
+                int newIconSizeIndex = Mathf.RoundToInt(GUILayout.HorizontalSlider(iconSizeIndex, 0, _iconSizes.Length - 1));
+                EditorGUILayout.LabelField($"{_iconSizes[newIconSizeIndex]}px", GUIStyleManager.Label, GUILayout.Width(50));
+                
                 if (newIconSizeIndex != iconSizeIndex)
                 {
                     EditorPrefs.SetInt(PREFS_KEY_ICON_SIZE, _iconSizes[newIconSizeIndex]);
+                    OnSettingsChanged?.Invoke();
                 }
                 EditorGUILayout.EndHorizontal();
 
                 // 文字サイズ設定
-                int currentFontSize = EditorPrefs.GetInt(PREFS_KEY_FONT_SIZE, 12);
-                int fontSizeIndex = Array.IndexOf(_fontSizes, currentFontSize);
-                if (fontSizeIndex == -1) fontSizeIndex = 1; // デフォルトは中(12)
+                int currentFontSize = EditorPrefs.GetInt(PREFS_KEY_FONT_SIZE, 13);
+                int fontSizeIndex = GetClosestIndex(_fontSizes, currentFontSize);
 
                 EditorGUILayout.BeginHorizontal();
                 EditorGUILayout.LabelField("文字サイズ:", GUIStyleManager.Label, GUILayout.Width(120));
-                int newFontSizeIndex = EditorGUILayout.Popup(fontSizeIndex, _sizeOptions, GUIStyleManager.Popup, GUILayout.Width(100));
+                int newFontSizeIndex = Mathf.RoundToInt(GUILayout.HorizontalSlider(fontSizeIndex, 0, _fontSizes.Length - 1));
+                EditorGUILayout.LabelField($"{_fontSizes[newFontSizeIndex]}px", GUIStyleManager.Label, GUILayout.Width(50));
+
                 if (newFontSizeIndex != fontSizeIndex)
                 {
                     EditorPrefs.SetInt(PREFS_KEY_FONT_SIZE, _fontSizes[newFontSizeIndex]);
+                    OnSettingsChanged?.Invoke();
                 }
                 EditorGUILayout.EndHorizontal();
 
@@ -648,6 +657,25 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             EditorGUILayout.EndHorizontal();
+        }
+
+        /// <summary>
+        /// 配列内で指定された値に最も近い値のインデックスを取得する
+        /// </summary>
+        private int GetClosestIndex(int[] values, int target)
+        {
+            int closestIndex = 0;
+            int minDiff = int.MaxValue;
+            for (int i = 0; i < values.Length; i++)
+            {
+                int diff = Math.Abs(values[i] - target);
+                if (diff < minDiff)
+                {
+                    minDiff = diff;
+                    closestIndex = i;
+                }
+            }
+            return closestIndex;
         }
     }
 }
