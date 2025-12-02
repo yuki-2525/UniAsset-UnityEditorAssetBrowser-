@@ -32,7 +32,7 @@ namespace UnityEditorAssetBrowser.Helper
         /// <summary>
         /// 現在設定されているアイコンサイズ
         /// </summary>
-        public static int IconSize => EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 210);
+        public static int IconSize => EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 120);
 
         /// <summary>
         /// 現在設定されているフォントサイズ

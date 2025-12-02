@@ -82,7 +82,7 @@ namespace UnityEditorAssetBrowser.Views
 
         // 表示サイズ設定
         private bool _showDisplaySizeSettings = false;
-        private readonly int[] _iconSizes = new[] { 90, 120, 150, 180, 210, 240, 270, 300, 330};
+        private readonly int[] _iconSizes = new[] { 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300 };
         private readonly int[] _fontSizes = new[] { 10, 11, 12, 13, 14, 15, 16 };
 
         // 初期設定リスト（abc順）
@@ -252,7 +252,7 @@ namespace UnityEditorAssetBrowser.Views
                 EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
                 // アイコンサイズ設定
-                int currentIconSize = EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 210);
+                int currentIconSize = EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 120);
                 int iconSizeIndex = GetClosestIndex(_iconSizes, currentIconSize);
 
                 EditorGUILayout.BeginHorizontal();
