@@ -8,6 +8,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using UnityEditor;
+using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
 using UnityEngine;
@@ -43,7 +44,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="item">表示するアイテム</param>
         public void ShowAvatarItem(IDatabaseItem item)
         {
-            GUILayout.BeginVertical(EditorStyles.helpBox);
+            GUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
             DrawItemHeader(
                 item.GetTitle(),
@@ -108,8 +109,8 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawItemBasicInfo(string title, string author)
         {
-            GUILayout.Label(title, EditorStyles.boldLabel);
-            GUILayout.Label($"作者: {author}");
+            GUILayout.Label(title, GUIStyleManager.BoldLabel);
+            GUILayout.Label($"作者: {author}", GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -127,7 +128,7 @@ namespace UnityEditorAssetBrowser.Views
 
             // タグ
             if (tags.Length > 0)
-                GUILayout.Label($"タグ: {string.Join(", ", tags)}", EditorStyles.wordWrappedLabel);
+                GUILayout.Label($"タグ: {string.Join(", ", tags)}", GUIStyleManager.WordWrappedLabel);
 
             // メモ
             if (!string.IsNullOrEmpty(memo))
@@ -151,7 +152,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawBoothOpenButton(int boothItemId)
         {
-            if (GUILayout.Button("商品ページを開く", GUILayout.Width(150)))
+            if (GUILayout.Button("商品ページを開く", GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 Application.OpenURL($"https://booth.pm/ja/items/{boothItemId}");
             }
@@ -164,7 +165,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="category">カテゴリ</param>
         private void DrawCategory(string category)
         {
-            GUILayout.Label($"カテゴリ: {category}");
+            GUILayout.Label($"カテゴリ: {category}", GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -175,7 +176,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             string supportedAvatarsText = $"対応アバター: {string.Join(", ", supportedAvatars)}";
 
-            GUILayout.Label(supportedAvatarsText, EditorStyles.wordWrappedLabel);
+            GUILayout.Label(supportedAvatarsText, GUIStyleManager.WordWrappedLabel);
         }
 
         /// <summary>
@@ -203,12 +204,12 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             string toggleText = _memoFoldouts[memoKey] ? "▼メモ" : "▶メモ";
-            EditorGUI.LabelField(boxRect, toggleText);
+            EditorGUI.LabelField(boxRect, toggleText, GUIStyleManager.Label);
 
             if (_memoFoldouts[memoKey])
             {
                 EditorGUI.indentLevel++;
-                EditorGUILayout.LabelField(memo ?? string.Empty, EditorStyles.wordWrappedLabel);
+                EditorGUILayout.LabelField(memo ?? string.Empty, GUIStyleManager.WordWrappedLabel);
                 EditorGUI.indentLevel--;
             }
 
@@ -221,7 +222,7 @@ namespace UnityEditorAssetBrowser.Views
                 endY - startY + 10
             );
             EditorGUI.DrawRect(frameRect, new Color(0.5f, 0.5f, 0.5f, 0.2f));
-            GUI.Box(frameRect, "", EditorStyles.helpBox);
+            GUI.Box(frameRect, "", GUIStyleManager.BoxStyle);
         }
 
         /// <summary>
@@ -237,7 +238,8 @@ namespace UnityEditorAssetBrowser.Views
                 var texture = ImageServices.Instance.LoadTexture(imagePath);
                 if (texture == null) return;
 
-                GUILayout.Label(texture, GUILayout.Width(100), GUILayout.Height(100));
+                int size = GUIStyleManager.IconSize;
+                GUILayout.Label(texture, GUILayout.Width(size), GUILayout.Height(size));
             }
         }
 
@@ -249,7 +251,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             if (!Directory.Exists(itemPath)) return;
 
-            if (GUILayout.Button("Explorerで開く", GUILayout.Width(150)))
+            if (GUILayout.Button("Explorerで開く", GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 Process.Start("explorer.exe", itemPath);
             }
@@ -263,30 +265,143 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="category">カテゴリ</param>
         private void DrawUnityPackageItem(string package, string imagePath, string category)
         {
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(string.Join("/", Path.GetDirectoryName(package).Split(Path.DirectorySeparatorChar).TakeLast(2)) + "/" + Path.GetFileName(package));
+            string directory = Path.GetDirectoryName(package);
+            var parts = directory.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+            string labelText;
 
-            if (GUILayout.Button("インポート", GUILayout.Width(100)))
+            // 親フォルダの1つ上がUUID（GUID）形式の場合は、冗長なので表示を省略する
+            if (parts.Length >= 2 && Guid.TryParse(parts[parts.Length - 2], out _))
             {
-                // フォルダサムネイル生成設定を取得
-                bool generateFolderThumbnail = EditorPrefs.GetBool(
-                    "UnityEditorAssetBrowser_GenerateFolderThumbnail",
-                    true
-                );
+                labelText = parts.Last() + "/" + Path.GetFileName(package);
+            }
+            else
+            {
+                labelText = string.Join("/", parts.TakeLast(2)) + "/" + Path.GetFileName(package);
+            }
 
-                if (generateFolderThumbnail)
+            // 幅計算（インデントやスクロールバーの余裕を考慮）
+            float indentPixels = EditorGUI.indentLevel * 15f;
+            float padding = 40f; // コンテナのパディングやマージン
+            float viewWidth = EditorGUIUtility.currentViewWidth - indentPixels - padding;
+
+            float fullLabelWidth = GUIStyleManager.Label.CalcSize(new GUIContent(labelText)).x;
+            float buttonWidth = 100f;
+            float spacing = 20f;
+            
+            bool isMultiLine = (fullLabelWidth + buttonWidth + spacing) > viewWidth;
+            
+            // 表示用ラベルとツールチップの準備
+            string displayLabel = labelText;
+            string tooltip = "";
+
+            // 利用可能なテキスト幅
+            float availableTextWidth = isMultiLine ? viewWidth : (viewWidth - buttonWidth - spacing);
+
+            // テキストが幅を超える場合の省略処理
+            if (fullLabelWidth > availableTextWidth)
+            {
+                tooltip = labelText; // 全文をツールチップに設定
+                
+                // "..." の幅
+                float ellipsisWidth = GUIStyleManager.Label.CalcSize(new GUIContent("...")).x;
+                float targetWidth = availableTextWidth - ellipsisWidth;
+                
+                if (targetWidth > 0)
                 {
-                    // サムネイルも生成する
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category);
+                    // 後ろから文字を足していって幅に収まる最大長を探す
+                    // パフォーマンスのため、ある程度推測してから調整する
+                    float avgCharWidth = fullLabelWidth / labelText.Length;
+                    int approxChars = (int)(targetWidth / avgCharWidth);
+                    
+                    // 安全マージンをとって開始位置を決定
+                    int startIndex = Math.Max(0, labelText.Length - approxChars);
+                    string tempText = labelText.Substring(startIndex);
+                    
+                    // 幅を超えている間、開始位置を後ろにずらす（文字数を減らす）
+                    while (GUIStyleManager.Label.CalcSize(new GUIContent(tempText)).x > targetWidth && startIndex < labelText.Length)
+                    {
+                        startIndex++;
+                        tempText = labelText.Substring(startIndex);
+                    }
+                    
+                    // 幅に余裕がある間、開始位置を前にずらす（文字数を増やす）
+                    while (startIndex > 0)
+                    {
+                        string nextTry = labelText.Substring(startIndex - 1);
+                        if (GUIStyleManager.Label.CalcSize(new GUIContent(nextTry)).x > targetWidth)
+                        {
+                            break;
+                        }
+                        startIndex--;
+                        tempText = nextTry;
+                    }
+                    
+                    displayLabel = "..." + tempText;
                 }
                 else
                 {
-                    // 通常のUnityパッケージインポートのみ
-                    AssetDatabase.ImportPackage(package, true);
+                    displayLabel = "..."; // 幅が極端に狭い場合
+                }
+            }
+
+            GUIContent labelContent = new GUIContent(displayLabel, tooltip);
+
+            if (isMultiLine)
+            {
+                GUILayout.BeginVertical();
+                GUILayout.Label(labelContent, GUIStyleManager.Label);
+                GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
+                GUILayout.FlexibleSpace();
+            }
+            else
+            {
+                GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
+                GUILayout.Label(labelContent, GUIStyleManager.Label);
+                GUILayout.FlexibleSpace();
+            }
+
+            // ボタンの矩形を確保
+            var buttonContent = new GUIContent("インポート");
+            var buttonRect = GUILayoutUtility.GetRect(buttonContent, GUIStyleManager.Button, GUILayout.Width(buttonWidth));
+
+            // 右クリックメニューの表示
+            if (Event.current.type == EventType.ContextClick && buttonRect.Contains(Event.current.mousePosition))
+            {
+                var menu = new GenericMenu();
+                menu.AddItem(new GUIContent("カテゴリフォルダ下にインポート"), false, () => 
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true));
+                menu.AddItem(new GUIContent("直接インポート"), false, () => 
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false));
+                menu.ShowAsContext();
+                Event.current.Use();
+            }
+
+            // 右クリックイベントがボタンに干渉しないように制御
+            // 右クリック（button 1）のイベント中はGUI.Buttonを実行せず、描画のみ行う
+            bool isRightClick = Event.current.button == 1 && buttonRect.Contains(Event.current.mousePosition);
+            
+            if (isRightClick)
+            {
+                if (Event.current.type == EventType.Repaint)
+                {
+                    GUIStyleManager.Button.Draw(buttonRect, buttonContent, false, false, false, false);
+                }
+            }
+            else
+            {
+                // 左クリック（通常のボタン動作）
+                if (GUI.Button(buttonRect, buttonContent, GUIStyleManager.Button))
+                {
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, null);
                 }
             }
 
             GUILayout.EndHorizontal();
+
+            if (isMultiLine)
+            {
+                GUILayout.EndVertical();
+            }
         }
 
         private readonly Dictionary<string, string[]> _cachedUnitypackages = new Dictionary<string, string[]>();
@@ -348,7 +463,7 @@ namespace UnityEditorAssetBrowser.Views
                     _unityPackageFoldouts[itemName],
                     ""
                 );
-                EditorGUI.LabelField(labelRect, "UnityPackage");
+                EditorGUI.LabelField(labelRect, "UnityPackage", GUIStyleManager.Label);
 
                 if (_unityPackageFoldouts[itemName])
                 {

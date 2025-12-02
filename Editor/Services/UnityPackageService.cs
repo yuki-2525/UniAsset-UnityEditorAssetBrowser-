@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 
@@ -18,6 +19,7 @@ namespace UnityEditorAssetBrowser.Services
     public static class UnityPackageServices
     {
         private const string PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER = "UnityEditorAssetBrowser_ImportToCategoryFolder";
+        private const string PREFS_KEY_GENERATE_FOLDER_THUMBNAIL = "UnityEditorAssetBrowser_GenerateFolderThumbnail";
 
         /// <summary>
         /// 指定されたディレクトリ内のUnityPackageファイルを検索する
@@ -62,118 +64,114 @@ namespace UnityEditorAssetBrowser.Services
         /// <param name="packagePath">パッケージパス</param>
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="category">カテゴリ</param>
-        public static void ImportPackageAndSetThumbnails(string packagePath, string imagePath, string category)
+        /// <param name="forceImportToCategoryFolder">カテゴリフォルダへのインポートを強制するかどうか（nullの場合は設定に従う）</param>
+        public static async void ImportPackageAndSetThumbnails(string packagePath, string imagePath, string category, bool? forceImportToCategoryFolder = null)
         {
-            var beforeFolders = GetAssetFolders();
+            bool generateThumbnail = EditorPrefs.GetBool(PREFS_KEY_GENERATE_FOLDER_THUMBNAIL, true);
+            var beforeFolders = generateThumbnail ? GetAssetFolders() : new List<string>();
 
             try
             {
-                bool importToCategoryFolder = EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
-                
-                AssetDatabase.ImportPackage(packagePath, true);
+                bool importToCategoryFolder = forceImportToCategoryFolder ?? EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
+                string pathToImport = packagePath;
+                bool isModified = false;
 
-                // インポート完了後の処理を設定
-                if (_importCompletedHandler != null)
+                if (importToCategoryFolder && !string.IsNullOrEmpty(category))
                 {
-                    AssetDatabase.importPackageCompleted -= _importCompletedHandler;
+                    try
+                    {
+                        // クリーンアップ（前回のゴミがあれば）
+                        UnityPackageModifier.Cleanup();
+
+                        EditorUtility.DisplayProgressBar("Preparing Package", "Modifying package structure...", 0.5f);
+                        pathToImport = await UnityPackageModifier.CreateModifiedPackageAsync(packagePath, category);
+                        isModified = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"[UnityPackageService] Failed to modify package: {ex.Message}");
+                        pathToImport = packagePath;
+                        isModified = false;
+                    }
+                    finally
+                    {
+                        EditorUtility.ClearProgressBar();
+                    }
+                }
+                
+                // サムネイル生成もパッケージ変更も不要なら、単純にインポートして終了
+                if (!generateThumbnail && !isModified)
+                {
+                    AssetDatabase.ImportPackage(pathToImport, true);
+                    return;
+                }
+
+                AssetDatabase.ImportPackage(pathToImport, true);
+
+                // イベントハンドラの解除ヘルパー
+                void UnregisterHandlers()
+                {
+                    if (_importCompletedHandler != null)
+                    {
+                        AssetDatabase.importPackageCompleted -= _importCompletedHandler;
+                        _importCompletedHandler = null;
+                    }
+                    if (_importCancelledHandler != null)
+                    {
+                        AssetDatabase.importPackageCancelled -= _importCancelledHandler;
+                        _importCancelledHandler = null;
+                    }
+                    if (_importFailedHandler != null)
+                    {
+                        AssetDatabase.importPackageFailed -= _importFailedHandler;
+                        _importFailedHandler = null;
+                    }
+                }
+
+                UnregisterHandlers();
+
+                // 一時ファイル削除ヘルパー
+                void DeleteTempPackage()
+                {
+                    if (isModified && pathToImport != packagePath && File.Exists(pathToImport))
+                    {
+                        try 
+                        { 
+                            File.Delete(pathToImport);
+                        }
+                        catch (Exception ex) 
+                        { 
+                            Debug.LogWarning($"[UnityPackageService] 一時パッケージの削除に失敗しました: {pathToImport}\nError: {ex.Message}");
+                        }
+                    }
                 }
 
                 _importCompletedHandler = packageName =>
                 {
                     try
                     {
-                        // アセットデータベースを更新
-                        AssetDatabase.Refresh();
+                        DeleteTempPackage();
 
-                        // インポート後のフォルダ一覧を取得
-                        var afterFolders = GetAssetFolders();
-
-                        // 新しく追加されたフォルダを特定
-                        var newFolders = afterFolders.Except(beforeFolders).ToList();
-
-                        // サムネイルの設定
-                        if (newFolders.Any())
+                        if (generateThumbnail)
                         {
-                            SetFolderThumbnails(newFolders, imagePath);
-                        }
-                        else
-                        {
-                            Debug.LogWarning("[UnityPackageService] 新規フォルダが見つかりませんでした");
-                        }
-
-                        if (importToCategoryFolder && !string.IsNullOrEmpty(category) && newFolders.Any())
-                        {
-                            // カテゴリフォルダのパスを設定
-                            string categoryPath = Path.Combine("Assets", category);
-
-                            // カテゴリフォルダが実際に存在するか確認（より厳密な方法）
-                            bool folderExists = AssetDatabase.IsValidFolder(categoryPath);
-
-                            if (!folderExists)
-                            {
-                                // 同名のアセットが存在するか確認
-                                string assetGuid = AssetDatabase.AssetPathToGUID(categoryPath);
-                                if (!string.IsNullOrEmpty(assetGuid))
-                                {
-                                    Debug.LogError($"[UnityPackageService] 同名のアセットが既に存在します: {categoryPath}");
-                                    return;
-                                }
-
-                                string result = AssetDatabase.CreateFolder("Assets", category);
-                                if (string.IsNullOrEmpty(result))
-                                {
-                                    Debug.LogError($"[UnityPackageService] カテゴリフォルダの作成に失敗しました: {categoryPath}");
-                                    return;
-                                }
-
-                                AssetDatabase.Refresh();
-                            }
-
-                            // 新しいフォルダをカテゴリフォルダに移動
-                            foreach (var folder in newFolders)
-                            {
-                                // フォルダがカテゴリフォルダの配下または親にカテゴリフォルダを含む場合はスキップ
-                                if (folder.StartsWith(categoryPath + "/") || folder.Contains($"/{category}/"))
-                                    continue;
-
-                                if (Directory.Exists(folder))
-                                {
-                                    string folderName = Path.GetFileName(folder);
-                                    string newPath = Path.Combine(categoryPath, folderName);
-                                    
-                                    // 移動先に同名のフォルダが存在する場合、その中に移動
-                                    if (Directory.Exists(newPath))
-                                    {
-                                        // フォルダ内の全アセットを移動
-                                        string[] assets = Directory.GetFiles(folder, "*.*", SearchOption.AllDirectories);
-
-                                        foreach (var asset in assets)
-                                        {
-                                            if (Path.GetExtension(asset) != ".meta")
-                                            {
-                                                string relativePath = Path.GetRelativePath(folder, asset);
-                                                string targetPath = Path.Combine(newPath, relativePath);
-                                                string targetDir = Path.GetDirectoryName(targetPath);
-
-                                                if (!string.IsNullOrEmpty(targetDir) && !Directory.Exists(targetDir)) Directory.CreateDirectory(targetDir);
-
-                                                string result = AssetDatabase.MoveAsset(asset, targetPath);
-                                                if (!string.IsNullOrEmpty(result)) Debug.LogError($"[UnityPackageService] アセット移動エラー: {result}");
-                                            }
-                                        }
-                                        
-                                        // 空になったフォルダを削除
-                                        AssetDatabase.DeleteAsset(folder);
-                                    }
-                                    else
-                                    {
-                                        // フォルダを移動
-                                        string result = AssetDatabase.MoveAsset(folder, newPath);
-                                        if (!string.IsNullOrEmpty(result)) Debug.LogError($"[UnityPackageService] フォルダ移動エラー: {result}");
-                                    }
-                                }
-                            }
+                            // アセットデータベースを更新
                             AssetDatabase.Refresh();
+
+                            // インポート後のフォルダ一覧を取得
+                            var afterFolders = GetAssetFolders();
+
+                            // 新しく追加されたフォルダを特定
+                            var newFolders = afterFolders.Except(beforeFolders).ToList();
+
+                            // サムネイルの設定
+                            if (newFolders.Any())
+                            {
+                                SetFolderThumbnails(newFolders, imagePath);
+                            }
+                            else
+                            {
+                                Debug.LogWarning("[UnityPackageService] 新規フォルダが見つかりませんでした");
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -182,16 +180,26 @@ namespace UnityEditorAssetBrowser.Services
                     }
                     finally
                     {
-                        // ハンドラを使い捨てにする
-                        if (_importCompletedHandler != null)
-                        {
-                            AssetDatabase.importPackageCompleted -= _importCompletedHandler;
-                            _importCompletedHandler = null;
-                        }
+                        UnregisterHandlers();
                     }
                 };
 
+                _importCancelledHandler = packageName =>
+                {
+                    DeleteTempPackage();
+                    UnregisterHandlers();
+                };
+
+                _importFailedHandler = (packageName, error) =>
+                {
+                    DeleteTempPackage();
+                    UnregisterHandlers();
+                    Debug.LogError($"[UnityPackageService] インポートに失敗しました: {error}");
+                };
+
                 AssetDatabase.importPackageCompleted += _importCompletedHandler;
+                AssetDatabase.importPackageCancelled += _importCancelledHandler;
+                AssetDatabase.importPackageFailed += _importFailedHandler;
             }
             catch (Exception ex)
             {
@@ -320,13 +328,56 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         private static void ProcessExcludedFolders(List<string> excludedFolders, HashSet<string> targetFolders)
         {
-            var shallowest = excludedFolders.OrderBy(f => f.Count(c => c == '/')).First();
-            var parts = shallowest.Split('/');
-            if (parts.Length > 1)
+            if (!excludedFolders.Any()) return;
+
+            // まず全体の共通親を探す
+            string commonParent = GetDeepestCommonParent(excludedFolders);
+
+            // 共通親が適切（Assets直下やカテゴリ直下でない＝特定のアイテムフォルダ内）なら、
+            // 従来通り最も浅いものの親を採用
+            if (!IsRootOrCategoryRoot(commonParent))
             {
-                string parent = string.Join("/", parts.Take(parts.Length - 1));
-                if (!string.IsNullOrEmpty(parent) && !IsRootFolderIcon(parent))
-                    targetFolders.Add(parent);
+                var shallowest = excludedFolders.OrderBy(f => f.Count(c => c == '/')).First();
+                var parts = shallowest.Split('/');
+                if (parts.Length > 1)
+                {
+                    string parent = string.Join("/", parts.Take(parts.Length - 1));
+                    if (!string.IsNullOrEmpty(parent) && !IsRootFolderIcon(parent))
+                        targetFolders.Add(parent);
+                }
+                return;
+            }
+
+            // 共通親が不適切な場合（複数アイテムの可能性がある場合）、グルーピングして処理
+            // 例: Assets/Category/ItemA/Editor, Assets/Category/ItemB/Editor
+            var groups = excludedFolders.GroupBy(f =>
+            {
+                if (f.Length <= commonParent.Length) return f;
+                
+                string relative = f.Substring(commonParent.Length).TrimStart('/');
+                int slashIndex = relative.IndexOf('/');
+                if (slashIndex == -1) return f;
+                
+                string firstPart = relative.Substring(0, slashIndex);
+                return Path.Combine(commonParent, firstPart).Replace('\\', '/');
+            });
+
+            foreach (var group in groups)
+            {
+                // 各グループ内で最も浅い除外フォルダを探す
+                var shallowestInGroup = group.OrderBy(f => f.Count(c => c == '/')).First();
+                var parts = shallowestInGroup.Split('/');
+                if (parts.Length > 1)
+                {
+                    string parent = string.Join("/", parts.Take(parts.Length - 1));
+                    
+                    // 親フォルダがルートやカテゴリルートそのものでない場合のみ追加
+                    // (ItemA/Editor -> ItemA はOK。 Category/Editor -> Category はNG)
+                    if (!string.IsNullOrEmpty(parent) && !IsRootFolderIcon(parent) && !IsRootOrCategoryRoot(parent))
+                    {
+                        targetFolders.Add(parent);
+                    }
+                }
             }
         }
 
@@ -337,15 +388,77 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (!folders.Any()) return;
 
+            // まず全体の共通親を探す
             string commonParent = GetDeepestCommonParent(folders);
-            if (!string.IsNullOrEmpty(commonParent))
+            
+            // 共通親が適切（Assets直下やカテゴリ直下でない）なら、それを採用
+            if (!IsRootOrCategoryRoot(commonParent))
             {
                 string bestFolder = FindBestThumbnailFolder(commonParent);
                 if (!string.IsNullOrEmpty(bestFolder) && !IsRootFolderIcon(bestFolder))
                 {
                     targetFolders.Add(bestFolder);
                 }
+                return;
             }
+
+            // 共通親が不適切な場合、フォルダリストをグルーピングして、それぞれのグループごとに処理を行う
+            // 例: Assets/Category/ItemA/..., Assets/Category/ItemB/... 
+            // -> ItemAグループとItemBグループに分けて、それぞれでサムネイル設定先を探す
+            
+            // 共通親の直下のフォルダでグルーピング
+            var groups = folders.GroupBy(f =>
+            {
+                // commonParentより1階層深い部分を取得
+                // commonParent = "Assets/Category"
+                // f = "Assets/Category/ItemA/File"
+                // -> "Assets/Category/ItemA" をキーにする
+                
+                if (f.Length <= commonParent.Length) return f; // ありえないはずだが念のため
+                
+                string relative = f.Substring(commonParent.Length).TrimStart('/');
+                int slashIndex = relative.IndexOf('/');
+                if (slashIndex == -1) return f; // ファイルパスそのものか、直下のフォルダ
+                
+                string firstPart = relative.Substring(0, slashIndex);
+                return Path.Combine(commonParent, firstPart).Replace('\\', '/');
+            });
+
+            foreach (var group in groups)
+            {
+                // 各グループ（ItemA, ItemB...）に対して再帰的に処理を行うか、
+                // あるいはそのグループのキー（ItemAフォルダ）を起点にFindBestThumbnailFolderを呼ぶ
+                
+                string groupKey = group.Key;
+                
+                // グループキー自体が除外フォルダならスキップ
+                if (ExcludeFolderService.IsExcludedFolder(Path.GetFileName(groupKey))) continue;
+
+                // グループ内のパスを使って、そのグループ内での最適なフォルダを探す
+                // ここではシンプルにグループキー（ItemAなど）を起点にする
+                string bestFolder = FindBestThumbnailFolder(groupKey);
+                if (!string.IsNullOrEmpty(bestFolder) && !IsRootFolderIcon(bestFolder))
+                {
+                    targetFolders.Add(bestFolder);
+                }
+            }
+        }
+
+        private static bool IsRootOrCategoryRoot(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            if (path == "Assets") return true;
+
+            bool importToCategoryFolder = EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
+            if (importToCategoryFolder)
+            {
+                var parts = path.Split('/');
+                if (parts.Length == 2 && parts[0] == "Assets")
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -411,6 +524,8 @@ namespace UnityEditorAssetBrowser.Services
 
         // importPackageCompleted 用の一時ハンドラ
         private static AssetDatabase.ImportPackageCallback? _importCompletedHandler;
+        private static AssetDatabase.ImportPackageCallback? _importCancelledHandler;
+        private static AssetDatabase.ImportPackageFailedCallback? _importFailedHandler;
 
         /// <summary>
         /// 指定したパスがAssets直下のFolderIcon.jpgか判定する

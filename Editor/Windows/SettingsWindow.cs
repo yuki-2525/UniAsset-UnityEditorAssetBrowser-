@@ -1,5 +1,6 @@
 // Copyright (c) 2025 sakurayuki
 
+using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Services;
 using UnityEditorAssetBrowser.ViewModels;
@@ -41,6 +42,15 @@ namespace UnityEditorAssetBrowser.Windows
                 DatabaseService.OnAEDatabasePathChanged,
                 DatabaseService.OnKADatabasePathChanged
             );
+
+            _settingsView.OnSettingsChanged += () =>
+            {
+                var window = Resources.FindObjectsOfTypeAll<UnityEditorAssetBrowser>().FirstOrDefault();
+                if (window != null)
+                {
+                    window.Repaint();
+                }
+            };
         }
 
         private void OnGUI()
