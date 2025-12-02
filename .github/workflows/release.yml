@@ -113,11 +113,9 @@ jobs:
           tag_name: ${{ env.version }}
 
       - name: Update Website
-        run: |
-          TOKEN=${{ secrets.TOKEN }}
-          curl \
-            -X POST \
-            -H "Authorization: token $TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/yuki-2525/vpm_sakurayuki_dev/dispatches \
-            -d '{"event_type":"automatic-vpm-update","client_payload":{"env": "dev"}}'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.TOKEN }}
+          repository: yuki-2525/vpm_sakurayuki_dev
+          event-type: automatic-vpm-update
+          client-payload: '{"env": "dev"}'
