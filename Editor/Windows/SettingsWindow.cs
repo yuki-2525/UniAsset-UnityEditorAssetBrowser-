@@ -22,7 +22,7 @@ namespace UnityEditorAssetBrowser.Windows
             PaginationViewModel paginationViewModel
         )
         {
-            var window = GetWindow<SettingsWindow>("設定");
+            var window = GetWindow<SettingsWindow>(LocalizationService.Instance.GetString("settings_window_title"));
             window.minSize = new Vector2(400, 200);
             window._assetBrowserViewModel = assetBrowserViewModel;
             window._searchViewModel = searchViewModel;

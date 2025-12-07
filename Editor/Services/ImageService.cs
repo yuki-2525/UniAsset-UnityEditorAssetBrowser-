@@ -180,7 +180,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Large image load failed for {path}: {ex.Message}");
+                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_large_image_load_failed"), path, ex.Message));
 
                 _mainThreadQueue.Enqueue(() => {
                     _loadingImages.Remove(path);
@@ -211,7 +211,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Texture creation failed for {path}: {ex.Message}");
+                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_texture_creation_failed"), path, ex.Message));
                 if (texture != null)
                 {
                     UnityEngine.Object.DestroyImmediate(texture);

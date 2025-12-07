@@ -42,15 +42,6 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary> アイテムのキャッシュ</summary>
         private List<IDatabaseItem>? _cachedItems = null;
 
-        /// <summary>タブのラベル</summary>
-        private static readonly string[] Tabs =
-        {
-            "アバター",
-            "アバター関連アセット",
-            "ワールドアセット",
-            "その他",
-        };
-
         /// <summary>
         /// コンストラクタ
         /// </summary>
@@ -118,7 +109,15 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawTabBar()
         {
-            var newTab = GUILayout.SelectionGrid(_paginationViewModel.SelectedTab, Tabs, Tabs.Length, GUIStyleManager.TabButton);
+            var tabs = new[]
+            {
+                LocalizationService.Instance.GetString("tab_avatar"),
+                LocalizationService.Instance.GetString("tab_avatar_assets"),
+                LocalizationService.Instance.GetString("tab_world_assets"),
+                LocalizationService.Instance.GetString("tab_others"),
+            };
+
+            var newTab = GUILayout.SelectionGrid(_paginationViewModel.SelectedTab, tabs, tabs.Length, GUIStyleManager.TabButton);
             if (newTab != _paginationViewModel.SelectedTab)
             {
                 _paginationViewModel.SelectedTab = newTab;
@@ -131,7 +130,7 @@ namespace UnityEditorAssetBrowser.Views
 
         private void DrawSearchResult(List<IDatabaseItem> totalItems)
         {
-            EditorGUILayout.LabelField($"検索結果: {totalItems.Count}件", GUIStyleManager.Label);
+            EditorGUILayout.LabelField(string.Format(LocalizationService.Instance.GetString("search_result_count"), totalItems.Count), GUIStyleManager.Label);
             EditorGUILayout.Space(10);
         }
 

@@ -20,11 +20,6 @@ namespace UnityEditorAssetBrowser
     /// </summary>
     public class UnityEditorAssetBrowser : EditorWindow
     {
-        #region Constants
-        /// <summary>ウィンドウのタイトル</summary>
-        private const string WINDOW_TITLE = "Asset Browser";
-        #endregion
-
         #region Fields
         /// <summary>ページネーション情報</summary>
         private readonly PaginationInfo _paginationInfo = new();
@@ -58,7 +53,9 @@ namespace UnityEditorAssetBrowser
         [MenuItem("Window/Unity Editor Asset Browser")]
         public static void ShowWindow()
         {
-            GetWindow<UnityEditorAssetBrowser>(WINDOW_TITLE);
+            var window = GetWindow<UnityEditorAssetBrowser>();
+            window.titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title"));
+            window.Show();
         }
 
         /// <summary>
@@ -66,6 +63,9 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnEnable()
         {
+            titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title"));
+            LocalizationService.Instance.OnLanguageChanged += UpdateTitle;
+
             // 除外フォルダ初期化と合成済みリスト保存
             ExcludeFolderService.InitializeDefaultExcludeFolders();
 
@@ -159,7 +159,14 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnDisable()
         {
+            LocalizationService.Instance.OnLanguageChanged -= UpdateTitle;
             UnregisterEventHandlers();
+        }
+
+        private void UpdateTitle()
+        {
+            titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title"));
+            Repaint();
         }
 
         /// <summary>

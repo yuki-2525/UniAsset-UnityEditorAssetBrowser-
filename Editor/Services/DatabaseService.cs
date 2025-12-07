@@ -123,8 +123,8 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     OnAEDatabasePathChanged("");
                     ShowErrorDialog(
-                        "パスエラー",
-                        "入力したパスが誤っています\n\n\"AvatarExplorer-v1.x.x\" フォルダ\nを指定してください"
+                        LocalizationService.Instance.GetString("error_path_title"),
+                        LocalizationService.Instance.GetString("error_ae_path_message")
                     );
                     return;
                 }
@@ -164,8 +164,8 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     OnKADatabasePathChanged("");
                     ShowErrorDialog(
-                        "パスエラー",
-                        "入力したパスが誤っています\n\nKonoAssetの設定にある\n\"アプリデータの保存先\"と\n同一のディレクトリを指定してください"
+                        LocalizationService.Instance.GetString("error_path_title"),
+                        LocalizationService.Instance.GetString("error_ka_path_message")
                     );
                     return;
                 }

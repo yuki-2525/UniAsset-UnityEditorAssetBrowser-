@@ -205,10 +205,27 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         public void Draw()
         {
+            // 言語設定
+            EditorGUILayout.BeginHorizontal();
+            EditorGUILayout.LabelField("language", GUILayout.Width(100));
+            var currentLang = LocalizationService.Instance.CurrentLanguage;
+            var availableLangs = LocalizationService.Instance.AvailableLanguages;
+            var displayLangs = availableLangs.Select(l => l == "ja" ? "日本語" : (l == "en" ? "English" : l)).ToArray();
+            var currentIndex = Array.IndexOf(availableLangs, currentLang);
+            if (currentIndex < 0) currentIndex = 0;
+            
+            var newIndex = EditorGUILayout.Popup(currentIndex, displayLangs);
+            if (newIndex != currentIndex)
+            {
+                LocalizationService.Instance.CurrentLanguage = availableLangs[newIndex];
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.Space(10);
+
             // データベース設定セクション
             _showDatabaseSettings = EditorGUILayout.Foldout(
                 _showDatabaseSettings,
-                "データベース設定",
+                LocalizationService.Instance.GetString("database_settings"),
                 true,
                 GUIStyleManager.Foldout
             );
@@ -242,7 +259,7 @@ namespace UnityEditorAssetBrowser.Views
             EditorGUILayout.Space(10);
             _showDisplaySizeSettings = EditorGUILayout.Foldout(
                 _showDisplaySizeSettings,
-                "表示サイズ設定",
+                LocalizationService.Instance.GetString("display_size_settings"),
                 true,
                 GUIStyleManager.Foldout
             );
@@ -256,7 +273,7 @@ namespace UnityEditorAssetBrowser.Views
                 int iconSizeIndex = GetClosestIndex(_iconSizes, currentIconSize);
 
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("アイコンサイズ:", GUIStyleManager.Label, GUILayout.Width(120));
+                EditorGUILayout.LabelField(LocalizationService.Instance.GetString("icon_size"), GUIStyleManager.Label, GUILayout.Width(120));
                 int newIconSizeIndex = Mathf.RoundToInt(GUILayout.HorizontalSlider(iconSizeIndex, 0, _iconSizes.Length - 1));
                 EditorGUILayout.LabelField($"{_iconSizes[newIconSizeIndex]}px", GUIStyleManager.Label, GUILayout.Width(50));
                 
@@ -272,7 +289,7 @@ namespace UnityEditorAssetBrowser.Views
                 int fontSizeIndex = GetClosestIndex(_fontSizes, currentFontSize);
 
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("文字サイズ:", GUIStyleManager.Label, GUILayout.Width(120));
+                EditorGUILayout.LabelField(LocalizationService.Instance.GetString("font_size"), GUIStyleManager.Label, GUILayout.Width(120));
                 int newFontSizeIndex = Mathf.RoundToInt(GUILayout.HorizontalSlider(fontSizeIndex, 0, _fontSizes.Length - 1));
                 EditorGUILayout.LabelField($"{_fontSizes[newFontSizeIndex]}px", GUIStyleManager.Label, GUILayout.Width(50));
 
@@ -290,7 +307,7 @@ namespace UnityEditorAssetBrowser.Views
             EditorGUILayout.Space(10);
             _showCategorySettings = EditorGUILayout.Foldout(
                 _showCategorySettings,
-                "AvatarExplorer カテゴリ設定",
+                LocalizationService.Instance.GetString("category_settings"),
                 true,
                 GUIStyleManager.Foldout
             );
@@ -301,7 +318,7 @@ namespace UnityEditorAssetBrowser.Views
                 if (aeDatabase == null)
                 {
                     EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
-                    EditorGUILayout.HelpBox("これはAvatar Explorer用の設定です", MessageType.Info);
+                    EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("ae_settings_info"), MessageType.Info);
                     EditorGUILayout.EndVertical();
                 }
                 else
@@ -327,12 +344,12 @@ namespace UnityEditorAssetBrowser.Views
                                 GUIStyleManager.BoldLabel,
                                 GUILayout.Width(200)
                             );
-                            EditorGUILayout.LabelField($"{items.Count}個のアイテム", GUIStyleManager.Label);
+                            EditorGUILayout.LabelField(string.Format(LocalizationService.Instance.GetString("items_count"), items.Count), GUIStyleManager.Label);
                             EditorGUILayout.EndHorizontal();
 
                             // アセットタイプの選択
                             EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField("アセットタイプ:", GUIStyleManager.Label, GUILayout.Width(100));
+                            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("asset_type"), GUIStyleManager.Label, GUILayout.Width(100));
                             var newValue = EditorGUILayout.Popup(
                                 _categoryAssetTypes[category],
                                 _assetTypes,
@@ -369,12 +386,12 @@ namespace UnityEditorAssetBrowser.Views
                             GUIStyleManager.BoldLabel,
                             GUILayout.Width(200)
                         );
-                        EditorGUILayout.LabelField($"{items.Count}個のアイテム", GUIStyleManager.Label);
+                        EditorGUILayout.LabelField(string.Format(LocalizationService.Instance.GetString("items_count"), items.Count), GUIStyleManager.Label);
                         EditorGUILayout.EndHorizontal();
 
                         // アセットタイプの選択
                         EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField("アセットタイプ:", GUIStyleManager.Label, GUILayout.Width(100));
+                        EditorGUILayout.LabelField(LocalizationService.Instance.GetString("asset_type"), GUIStyleManager.Label, GUILayout.Width(100));
 
                         var newValue = EditorGUILayout.Popup(
                             _categoryAssetTypes[category],
@@ -403,7 +420,7 @@ namespace UnityEditorAssetBrowser.Views
 
             _showFolderThumbnailSettings = EditorGUILayout.Foldout(
                 _showFolderThumbnailSettings,
-                "フォルダサムネイル設定",
+                LocalizationService.Instance.GetString("folder_thumbnail_settings"),
                 true,
                 GUIStyleManager.Foldout
             );
@@ -419,7 +436,7 @@ namespace UnityEditorAssetBrowser.Views
                 );
 
                 bool newShowFolderThumbnail = EditorGUILayout.ToggleLeft(
-                    "フォルダサムネイルを表示する",
+                    LocalizationService.Instance.GetString("show_folder_thumbnail"),
                     showFolderThumbnail,
                     GUIStyleManager.Label
                 );
@@ -446,7 +463,7 @@ namespace UnityEditorAssetBrowser.Views
 
                 EditorGUI.BeginDisabledGroup(newShowFolderThumbnail); // ONの間はグレーアウト
                 newGenerateFolderThumbnail = EditorGUILayout.ToggleLeft(
-                    "フォルダサムネイルを生成する",
+                    LocalizationService.Instance.GetString("generate_folder_thumbnail"),
                     generateFolderThumbnail,
                     GUIStyleManager.Label
                 );
@@ -456,10 +473,10 @@ namespace UnityEditorAssetBrowser.Views
                 if (!newShowFolderThumbnail && generateFolderThumbnail && !newGenerateFolderThumbnail)
                 {
                     bool confirm = EditorUtility.DisplayDialog(
-                        "注意",
-                        "この設定をオフにすると、\nオフの間にインポートしたアセットのサムネイルは\nオンに戻した後も表示されません。\n\nよろしいですか？",
-                        "OK",
-                        "キャンセル"
+                        LocalizationService.Instance.GetString("warning"),
+                        LocalizationService.Instance.GetString("thumbnail_warning_message"),
+                        LocalizationService.Instance.GetString("ok"),
+                        LocalizationService.Instance.GetString("cancel")
                     );
 
                     if (confirm)
@@ -482,7 +499,7 @@ namespace UnityEditorAssetBrowser.Views
                 // 初期設定領域（トグル式、デフォルト閉じ）
                 _showDefaultExcludeFolders = EditorGUILayout.Foldout(
                     _showDefaultExcludeFolders,
-                    "初期設定除外フォルダ（ON/OFF）",
+                    LocalizationService.Instance.GetString("default_exclude_folders"),
                     true,
                     GUIStyleManager.Foldout
                 );
@@ -514,12 +531,12 @@ namespace UnityEditorAssetBrowser.Views
                 }
 
                 // ユーザー追加領域
-                EditorGUILayout.LabelField("ユーザー追加除外フォルダ", GUIStyleManager.BoldLabel);
-                EditorGUILayout.HelpBox("フォルダ名を指定することで、そのフォルダのサムネイル表示を無効にできます。\n正規表現を利用することが可能です。", MessageType.Info);
+                EditorGUILayout.LabelField(LocalizationService.Instance.GetString("user_exclude_folders"), GUIStyleManager.BoldLabel);
+                EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("exclude_folder_help"), MessageType.Info);
                 EditorGUILayout.BeginHorizontal();
                 GUI.SetNextControlName("NewExcludeFolderField");
                 _newExcludeFolder = EditorGUILayout.TextField(
-                    "新しい除外フォルダ",
+                    LocalizationService.Instance.GetString("add_exclude_folder"),
                     _newExcludeFolder,
                     GUIStyleManager.TextField
                 );
@@ -533,7 +550,7 @@ namespace UnityEditorAssetBrowser.Views
                     Event.current.Use();
                 }
 
-                if (GUILayout.Button("追加", GUIStyleManager.Button, GUILayout.Width(60)))
+                if (GUILayout.Button(LocalizationService.Instance.GetString("add"), GUIStyleManager.Button, GUILayout.Width(60)))
                 {
                     shouldAdd = true;
                 }
@@ -589,7 +606,7 @@ namespace UnityEditorAssetBrowser.Views
 
             _showImportSettings = EditorGUILayout.Foldout(
                 _showImportSettings,
-                "インポート設定",
+                LocalizationService.Instance.GetString("import_settings"),
                 true,
                 GUIStyleManager.Foldout
             );
@@ -600,13 +617,13 @@ namespace UnityEditorAssetBrowser.Views
 
                 bool importToCategoryFolder = EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
                 bool newValue = EditorGUILayout.ToggleLeft(
-                    "UnityPackageをカテゴリ名のフォルダの下にインポート",
+                    LocalizationService.Instance.GetString("import_to_category_folder_long"),
                     importToCategoryFolder,
                     GUIStyleManager.Label
                 );
 
-                EditorGUILayout.HelpBox("・インポート時間が長くなる可能性があります\n・前提アセットがある場合に正常に動作しない可能性があります", MessageType.Warning);
-                EditorGUILayout.HelpBox("この設定に関わらず、右クリックメニューからインポート方法を選択できます", MessageType.Info);
+                EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("import_warning"), MessageType.Warning);
+                EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("import_info"), MessageType.Info);
 
                 if (newValue != importToCategoryFolder)
                 {
@@ -634,17 +651,17 @@ namespace UnityEditorAssetBrowser.Views
             EditorGUI.EndDisabledGroup();
 
             // 削除ボタン
-            if (!string.IsNullOrEmpty(path) && GUILayout.Button("削除", GUIStyleManager.Button, GUILayout.Width(60)))
+            if (!string.IsNullOrEmpty(path) && GUILayout.Button(LocalizationService.Instance.GetString("remove"), GUIStyleManager.Button, GUILayout.Width(60)))
             {
                 onPathChanged("");
                 if (label == "AE Database Path:") InitializeCategoryAssetTypes();
             }
 
             // 参照ボタン
-            if (GUILayout.Button("参照", GUIStyleManager.Button, GUILayout.Width(60)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("browse"), GUIStyleManager.Button, GUILayout.Width(60)))
             {
                 var selectedPath = EditorUtility.OpenFolderPanel(
-                    $"Select {label} Directory",
+                    LocalizationService.Instance.GetString("select_directory"),
                     "",
                     ""
                 );

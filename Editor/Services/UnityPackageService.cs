@@ -31,19 +31,19 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (directory == null)
             {
-                Debug.LogError("ディレクトリパスがnullです");
+                Debug.LogError(LocalizationService.Instance.GetString("error_directory_null"));
                 return Array.Empty<string>();
             }
 
             if (string.IsNullOrEmpty(directory))
             {
-                Debug.LogError("ディレクトリパスが空です");
+                Debug.LogError(LocalizationService.Instance.GetString("error_directory_empty"));
                 return Array.Empty<string>();
             }
 
             if (!Directory.Exists(directory))
             {
-                Debug.LogError($"ディレクトリが存在しません: {directory}");
+                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_directory_not_found"), directory));
                 return Array.Empty<string>();
             }
 
@@ -53,7 +53,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException || ex is PathTooLongException)
             {
-                Debug.LogError($"UnityPackageファイルの検索中にエラーが発生しました: {ex.Message}");
+                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_search_unitypackage"), ex.Message));
                 return Array.Empty<string>();
             }
         }
@@ -89,7 +89,7 @@ namespace UnityEditorAssetBrowser.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"[UnityPackageService] Failed to modify package: {ex.Message}");
+                        Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_modify_package"), ex.Message));
                         pathToImport = packagePath;
                         isModified = false;
                     }
@@ -141,7 +141,7 @@ namespace UnityEditorAssetBrowser.Services
                         }
                         catch (Exception ex) 
                         { 
-                            Debug.LogWarning($"[UnityPackageService] 一時パッケージの削除に失敗しました: {pathToImport}\nError: {ex.Message}");
+                            Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_delete_temp_package_failed"), pathToImport, ex.Message));
                         }
                     }
                 }
@@ -170,13 +170,13 @@ namespace UnityEditorAssetBrowser.Services
                             }
                             else
                             {
-                                Debug.LogWarning("[UnityPackageService] 新規フォルダが見つかりませんでした");
+                                Debug.LogWarning(LocalizationService.Instance.GetString("warning_new_folder_not_found"));
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError($"[UnityPackageService] インポート後の処理に失敗しました: {ex.Message}");
+                        Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_post_import_failed"), ex.Message));
                     }
                     finally
                     {
@@ -194,7 +194,7 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     DeleteTempPackage();
                     UnregisterHandlers();
-                    Debug.LogError($"[UnityPackageService] インポートに失敗しました: {error}");
+                    Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_import_failed"), error));
                 };
 
                 AssetDatabase.importPackageCompleted += _importCompletedHandler;
@@ -203,7 +203,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"パッケージのインポートに失敗しました: {ex.Message}");
+                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_package_import_failed"), ex.Message));
             }
         }
 
@@ -246,7 +246,7 @@ namespace UnityEditorAssetBrowser.Services
             var targetFolders = DetermineTargetFolders(folders);
             if (!targetFolders.Any())
             {
-                Debug.LogWarning("[UnityPackageService] 対象フォルダが見つかりませんでした");
+                Debug.LogWarning(LocalizationService.Instance.GetString("warning_target_folder_not_found"));
                 return;
             }
 
@@ -260,13 +260,13 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (folders == null || !folders.Any())
             {
-                Debug.LogWarning("[UnityPackageService] フォルダが指定されていません");
+                Debug.LogWarning(LocalizationService.Instance.GetString("warning_folder_not_specified"));
                 return false;
             }
 
             if (string.IsNullOrEmpty(imagePath))
             {
-                Debug.LogWarning("[UnityPackageService] サムネイル画像パスが指定されていません");
+                Debug.LogWarning(LocalizationService.Instance.GetString("warning_thumbnail_path_not_specified"));
                 return false;
             }
 
@@ -280,13 +280,13 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (string.IsNullOrEmpty(imagePath))
             {
-                Debug.LogWarning("[UnityPackageService] 完全な画像パスを取得できませんでした");
+                Debug.LogWarning(LocalizationService.Instance.GetString("warning_full_image_path_failed"));
                 return string.Empty;
             }
 
             if (!File.Exists(imagePath))
             {
-                Debug.LogWarning($"[UnityPackageService] サムネイル画像が見つかりません: {imagePath}");
+                Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_not_found"), imagePath));
                 return string.Empty;
             }
 
@@ -475,7 +475,7 @@ namespace UnityEditorAssetBrowser.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"[UnityPackageService] サムネイル画像のコピーに失敗しました: {folder} - {ex.Message}");
+                    Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_copy_failed"), folder, ex.Message));
                 }
             }
 

@@ -4,6 +4,7 @@
 
 using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.ViewModels;
+using UnityEditorAssetBrowser.Services;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Views
@@ -52,7 +53,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawPreviousButton()
         {
-            if (GUILayout.Button("前へ", GUIStyleManager.Button, GUILayout.Width(100)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("prev_page"), GUIStyleManager.Button, GUILayout.Width(100)))
             {
                 _paginationViewModel.MoveToPreviousPage();
             }
@@ -71,7 +72,7 @@ namespace UnityEditorAssetBrowser.Views
             );
             
             int totalPages = _paginationViewModel.GetTotalPages(currentItems);
-            GUILayout.Label($"ページ {_paginationViewModel.CurrentPage + 1} / {totalPages}", GUIStyleManager.Label);
+            GUILayout.Label(string.Format(LocalizationService.Instance.GetString("page_info_format"), _paginationViewModel.CurrentPage + 1, totalPages), GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -79,7 +80,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawNextButton()
         {
-            if (GUILayout.Button("次へ", GUIStyleManager.Button, GUILayout.Width(100)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("next_page"), GUIStyleManager.Button, GUILayout.Width(100)))
             {
                 var currentItems = _paginationViewModel.GetCurrentTabItems(
                     () => _assetBrowserViewModel.GetFilteredAvatars(),

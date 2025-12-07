@@ -43,7 +43,7 @@ namespace UnityEditorAssetBrowser.Views
 
             // 基本検索フィールド
             EditorGUILayout.BeginHorizontal();
-            var searchLabel = "検索:";
+            var searchLabel = LocalizationService.Instance.GetString("search") + ":";
             var searchLabelWidth = GUIStyleManager.Label.CalcSize(new GUIContent(searchLabel)).x + 5;
             EditorGUILayout.LabelField(searchLabel, GUIStyleManager.Label, GUILayout.Width(searchLabelWidth));
             
@@ -60,7 +60,7 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             // 詳細検索のトグル
-            var advancedSearchLabel = "詳細検索";
+            var advancedSearchLabel = LocalizationService.Instance.GetString("advanced_search");
             var advancedSearchWidth = GUIStyleManager.Label.CalcSize(new GUIContent(advancedSearchLabel)).x + 25; // Toggle needs more space
             var newShowAdvancedSearch = EditorGUILayout.ToggleLeft(
                 advancedSearchLabel,
@@ -76,7 +76,7 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             // クリアボタン
-            var clearLabel = "クリア";
+            var clearLabel = LocalizationService.Instance.GetString("clear");
             var clearWidth = GUIStyleManager.Button.CalcSize(new GUIContent(clearLabel)).x + 10;
             if (GUILayout.Button(clearLabel, GUIStyleManager.Button, GUILayout.Width(clearWidth)))
             {
@@ -87,13 +87,13 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             // ソートボタン
-            var sortLabel = "▼ 表示順";
+            var sortLabel = LocalizationService.Instance.GetString("sort_order");
             var sortWidth = GUIStyleManager.Button.CalcSize(new GUIContent(sortLabel)).x + 10;
             if (GUILayout.Button(sortLabel, GUIStyleManager.Button, GUILayout.Width(sortWidth)))
             {
                 var menu = new GenericMenu();
                 menu.AddItem(
-                    new GUIContent("追加順（新しい順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_created_desc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.CreatedDateDesc,
                     () =>
@@ -102,7 +102,7 @@ namespace UnityEditorAssetBrowser.Views
                         )
                 );
                 menu.AddItem(
-                    new GUIContent("追加順（古い順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_created_asc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.CreatedDateAsc,
                     () =>
@@ -111,7 +111,7 @@ namespace UnityEditorAssetBrowser.Views
                         )
                 );
                 menu.AddItem(
-                    new GUIContent("アセット名（A-Z順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_title_asc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.TitleAsc,
                     () =>
@@ -120,7 +120,7 @@ namespace UnityEditorAssetBrowser.Views
                         )
                 );
                 menu.AddItem(
-                    new GUIContent("アセット名（Z-A順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_title_desc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.TitleDesc,
                     () =>
@@ -129,7 +129,7 @@ namespace UnityEditorAssetBrowser.Views
                         )
                 );
                 menu.AddItem(
-                    new GUIContent("ショップ名（A-Z順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_author_asc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.AuthorAsc,
                     () =>
@@ -138,7 +138,7 @@ namespace UnityEditorAssetBrowser.Views
                         )
                 );
                 menu.AddItem(
-                    new GUIContent("ショップ名（Z-A順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_author_desc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.AuthorDesc,
                     () =>
@@ -147,7 +147,7 @@ namespace UnityEditorAssetBrowser.Views
                         )
                 );
                 menu.AddItem(
-                    new GUIContent("Booth Id順（新しい順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_booth_id_desc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.BoothIdDesc,
                     () =>
@@ -156,7 +156,7 @@ namespace UnityEditorAssetBrowser.Views
                         )
                 );
                 menu.AddItem(
-                    new GUIContent("Booth Id順（古い順）"),
+                    new GUIContent(LocalizationService.Instance.GetString("sort_booth_id_asc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.BoothIdAsc,
                     () =>
@@ -312,15 +312,29 @@ namespace UnityEditorAssetBrowser.Views
         public void DrawDatabaseButtons()
         {
             EditorGUILayout.BeginHorizontal();
+
+            // 言語選択
+            GUILayout.Label("language :", GUIStyleManager.Label, GUILayout.ExpandWidth(false));
+            var languages = LocalizationService.Instance.AvailableLanguages;
+            var currentLang = LocalizationService.Instance.CurrentLanguage;
+            var currentIndex = System.Array.IndexOf(languages, currentLang);
+            if (currentIndex < 0) currentIndex = 0;
+            
+            var newIndex = EditorGUILayout.Popup(currentIndex, languages, GUILayout.Width(80));
+            if (newIndex != currentIndex && newIndex >= 0 && newIndex < languages.Length)
+            {
+                LocalizationService.Instance.CurrentLanguage = languages[newIndex];
+            }
+
             GUILayout.FlexibleSpace();
 
             // 追加: このソフトについてボタン
-            if (GUILayout.Button("このソフトについて", GUIStyleManager.Button))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("about"), GUIStyleManager.Button))
             {
                 AboutWindow.ShowWindow();
             }
 
-            if (GUILayout.Button("設定", GUIStyleManager.Button))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("settings"), GUIStyleManager.Button))
             {
                 SettingsWindow.ShowWindow(
                     _assetBrowserViewModel,
@@ -329,7 +343,7 @@ namespace UnityEditorAssetBrowser.Views
                 );
             }
 
-            if (GUILayout.Button("更新", GUIStyleManager.Button))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("update_database"), GUIStyleManager.Button))
             {
                 // データベースを更新
                 DatabaseService.LoadAEDatabase();

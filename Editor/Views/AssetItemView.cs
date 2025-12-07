@@ -110,7 +110,7 @@ namespace UnityEditorAssetBrowser.Views
         private void DrawItemBasicInfo(string title, string author)
         {
             GUILayout.Label(title, GUIStyleManager.BoldLabel);
-            GUILayout.Label($"作者: {author}", GUIStyleManager.Label);
+            GUILayout.Label($"{LocalizationService.Instance.GetString("author")}{author}", GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -128,7 +128,7 @@ namespace UnityEditorAssetBrowser.Views
 
             // タグ
             if (tags.Length > 0)
-                GUILayout.Label($"タグ: {string.Join(", ", tags)}", GUIStyleManager.WordWrappedLabel);
+                GUILayout.Label($"{LocalizationService.Instance.GetString("tags")}{string.Join(", ", tags)}", GUIStyleManager.WordWrappedLabel);
 
             // メモ
             if (!string.IsNullOrEmpty(memo))
@@ -152,7 +152,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawBoothOpenButton(int boothItemId)
         {
-            if (GUILayout.Button("商品ページを開く", GUIStyleManager.Button, GUILayout.Width(150)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("open_product_page"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 Application.OpenURL($"https://booth.pm/ja/items/{boothItemId}");
             }
@@ -165,7 +165,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="category">カテゴリ</param>
         private void DrawCategory(string category)
         {
-            GUILayout.Label($"カテゴリ: {category}", GUIStyleManager.Label);
+            GUILayout.Label($"{LocalizationService.Instance.GetString("category")}{category}", GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -174,7 +174,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="supportedAvatars">対応アバターのパス配列</param>
         private void DrawSupportedAvatars(string[] supportedAvatars)
         {
-            string supportedAvatarsText = $"対応アバター: {string.Join(", ", supportedAvatars)}";
+            string supportedAvatarsText = $"{LocalizationService.Instance.GetString("supported_avatars")}{string.Join(", ", supportedAvatars)}";
 
             GUILayout.Label(supportedAvatarsText, GUIStyleManager.WordWrappedLabel);
         }
@@ -203,7 +203,7 @@ namespace UnityEditorAssetBrowser.Views
                 Event.current.Use();
             }
 
-            string toggleText = _memoFoldouts[memoKey] ? "▼メモ" : "▶メモ";
+            string toggleText = _memoFoldouts[memoKey] ? $"▼{LocalizationService.Instance.GetString("memo")}" : $"▶{LocalizationService.Instance.GetString("memo")}";
             EditorGUI.LabelField(boxRect, toggleText, GUIStyleManager.Label);
 
             if (_memoFoldouts[memoKey])
@@ -251,7 +251,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             if (!Directory.Exists(itemPath)) return;
 
-            if (GUILayout.Button("Explorerで開く", GUIStyleManager.Button, GUILayout.Width(150)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("open_explorer"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 Process.Start("explorer.exe", itemPath);
             }
@@ -361,16 +361,16 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             // ボタンの矩形を確保
-            var buttonContent = new GUIContent("インポート");
+            var buttonContent = new GUIContent(LocalizationService.Instance.GetString("import"));
             var buttonRect = GUILayoutUtility.GetRect(buttonContent, GUIStyleManager.Button, GUILayout.Width(buttonWidth));
 
             // 右クリックメニューの表示
             if (Event.current.type == EventType.ContextClick && buttonRect.Contains(Event.current.mousePosition))
             {
                 var menu = new GenericMenu();
-                menu.AddItem(new GUIContent("カテゴリフォルダ下にインポート"), false, () => 
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_under_category")), false, () => 
                     UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true));
-                menu.AddItem(new GUIContent("直接インポート"), false, () => 
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_directly")), false, () => 
                     UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false));
                 menu.ShowAsContext();
                 Event.current.Use();
@@ -463,7 +463,7 @@ namespace UnityEditorAssetBrowser.Views
                     _unityPackageFoldouts[itemName],
                     ""
                 );
-                EditorGUI.LabelField(labelRect, "UnityPackage", GUIStyleManager.Label);
+                EditorGUI.LabelField(labelRect, LocalizationService.Instance.GetString("unity_package"), GUIStyleManager.Label);
 
                 if (_unityPackageFoldouts[itemName])
                 {
@@ -525,7 +525,7 @@ namespace UnityEditorAssetBrowser.Views
                     if (materialPackages.Any())
                     {
                         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-                        EditorGUILayout.LabelField("Material", GUIStyleManager.Label);
+                        EditorGUILayout.LabelField(LocalizationService.Instance.GetString("material"), EditorStyles.miniBoldLabel);
 
                         for (int i = 0; i < materialPackages.Count; i++)
                         {

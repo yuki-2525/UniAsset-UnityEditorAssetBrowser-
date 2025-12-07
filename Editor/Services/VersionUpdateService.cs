@@ -348,25 +348,26 @@ namespace UnityEditorAssetBrowser.Services
         {
             // package.jsonからdisplayNameを取得
             var displayName = GetCurrentDisplayName();
-            if (string.IsNullOrEmpty(displayName)) displayName = "このパッケージ";
+            if (string.IsNullOrEmpty(displayName)) displayName = LocalizationService.Instance.GetString("default_package_name");
 
-            var message =
-                $"\"{displayName}\"はアップデート可能です！\n\n" +
-                $"現在のバージョン: {currentVersion}\n" +
-                $"最新バージョン: {remoteInfo.version}\n\n" +
-                $"VCCよりアップデートしてください";
+            var message = string.Format(
+                LocalizationService.Instance.GetString("update_available_message"),
+                displayName,
+                currentVersion,
+                remoteInfo.version
+            );
 
             // ウィンドウタイトルにもdisplayNameを含める
-            var windowTitle = string.IsNullOrEmpty(displayName) || displayName == "このパッケージ"
-                ? "アップデート通知"
-                : $"{displayName} アップデート通知";
+            var windowTitle = string.IsNullOrEmpty(displayName) || displayName == LocalizationService.Instance.GetString("default_package_name")
+                ? LocalizationService.Instance.GetString("update_available_title")
+                : string.Format(LocalizationService.Instance.GetString("update_available_title_format"), displayName);
 
             var result = EditorUtility.DisplayDialogComplex(
                 windowTitle,
                 message,
-                "詳細を確認",
-                "後で通知",
-                "このバージョンを無視"
+                LocalizationService.Instance.GetString("update_dialog_details"),
+                LocalizationService.Instance.GetString("update_dialog_later"),
+                LocalizationService.Instance.GetString("update_dialog_ignore")
             );
 
             switch (result)
