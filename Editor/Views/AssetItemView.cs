@@ -468,18 +468,99 @@ namespace UnityEditorAssetBrowser.Views
                 if (_unityPackageFoldouts[itemName])
                 {
                     EditorGUI.indentLevel++;
-                    for (int i = 0; i < unityPackages.Count(); i++)
-                    {
-                        DrawUnityPackageItem(unityPackages.ElementAt(i), imagePath, category);
 
-                        // 最後のアイテム以外の後に線を描画
-                        if (i < unityPackages.Count() - 1)
+                    // パッケージを分類
+                    var keywords = new[] { "mat", "material", "tex", "texture", "base", "source","共通" };
+                    
+                    var scoredPackages = unityPackages.Select(p => 
+                    {
+                        string fileName = Path.GetFileName(p);
+                        int score = keywords.Sum(k => 
                         {
-                            var lineRect = EditorGUILayout.GetControlRect(false, 1);
-                            Color lineColor = LineColors[i % LineColors.Length];
-                            EditorGUI.DrawRect(lineRect, lineColor);
+                            int count = 0;
+                            int i = 0;
+                            while ((i = fileName.IndexOf(k, i, StringComparison.OrdinalIgnoreCase)) != -1)
+                            {
+                                i += k.Length;
+                                count++;
+                            }
+                            return count;
+                        });
+                        return new { Package = p, Score = score };
+                    }).ToList();
+
+                    int maxScore = scoredPackages.Any() ? scoredPackages.Max(x => x.Score) : 0;
+
+                    List<string> materialPackages;
+                    List<string> otherPackages;
+
+                    if (maxScore > 0)
+                    {
+                        materialPackages = scoredPackages
+                            .Where(x => x.Score == maxScore)
+                            .Select(x => x.Package)
+                            .ToList();
+                        
+                        otherPackages = scoredPackages
+                            .Where(x => x.Score < maxScore)
+                            .Select(x => x.Package)
+                            .ToList();
+                    }
+                    else
+                    {
+                        materialPackages = new List<string>();
+                        otherPackages = unityPackages.ToList();
+                    }
+
+                    // unityPackages > 2 かつ materialPackages > otherPackages の場合は全てotherPackagesとして処理
+                    if (unityPackages.Count() > 2 && materialPackages.Count > otherPackages.Count)
+                    {
+                        materialPackages.Clear();
+                        otherPackages = unityPackages.ToList();
+                    }
+
+                    int lineIndex = 0;
+
+                    // マテリアルパッケージの描画
+                    if (materialPackages.Any())
+                    {
+                        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                        EditorGUILayout.LabelField("Material", GUIStyleManager.Label);
+
+                        for (int i = 0; i < materialPackages.Count; i++)
+                        {
+                            DrawUnityPackageItem(materialPackages[i], imagePath, category);
+
+                            if (i < materialPackages.Count - 1)
+                            {
+                                var lineRect = EditorGUILayout.GetControlRect(false, 1);
+                                Color lineColor = LineColors[lineIndex % LineColors.Length];
+                                EditorGUI.DrawRect(lineRect, lineColor);
+                                lineIndex++;
+                            }
+                        }
+                        EditorGUILayout.EndVertical();
+
+                        if (otherPackages.Any())
+                        {
+                            EditorGUILayout.Space(2);
                         }
                     }
+
+                    // その他のパッケージの描画
+                    for (int i = 0; i < otherPackages.Count; i++)
+                    {
+                        DrawUnityPackageItem(otherPackages[i], imagePath, category);
+
+                        if (i < otherPackages.Count - 1)
+                        {
+                            var lineRect = EditorGUILayout.GetControlRect(false, 1);
+                            Color lineColor = LineColors[lineIndex % LineColors.Length];
+                            EditorGUI.DrawRect(lineRect, lineColor);
+                            lineIndex++;
+                        }
+                    }
+
                     EditorGUI.indentLevel--;
                 }
 
