@@ -79,9 +79,11 @@ namespace UnityEditorAssetBrowser.Views
         private const string PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER = "UnityEditorAssetBrowser_ImportToCategoryFolder";
         private const string PREFS_KEY_ICON_SIZE = "UnityEditorAssetBrowser_IconSize";
         private const string PREFS_KEY_FONT_SIZE = "UnityEditorAssetBrowser_FontSize";
+        private const string PREFS_KEY_AUTO_SEARCH = "UnityEditorAssetBrowser_AutoSearch";
 
         // 表示サイズ設定
         private bool _showDisplaySizeSettings = false;
+        private bool _showSearchSettings = false;
         private readonly int[] _iconSizes = new[] { 80, 100, 120, 140, 160, 180, 200, 220, 240, 260, 280, 300 };
         private readonly int[] _fontSizes = new[] { 10, 11, 12, 13, 14, 15, 16 };
 
@@ -251,6 +253,34 @@ namespace UnityEditorAssetBrowser.Views
                     DatabaseService.GetKADatabasePath(),
                     _onKADatabasePathChanged
                 );
+
+                EditorGUILayout.EndVertical();
+            }
+
+            // 検索設定セクション
+            EditorGUILayout.Space(10);
+            _showSearchSettings = EditorGUILayout.Foldout(
+                _showSearchSettings,
+                LocalizationService.Instance.GetString("search_settings"),
+                true,
+                GUIStyleManager.Foldout
+            );
+
+            if (_showSearchSettings)
+            {
+                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
+
+                bool autoSearch = EditorPrefs.GetBool(PREFS_KEY_AUTO_SEARCH, true);
+                bool newAutoSearch = EditorGUILayout.ToggleLeft(
+                    LocalizationService.Instance.GetString("auto_search"),
+                    autoSearch,
+                    GUIStyleManager.Label
+                );
+
+                if (newAutoSearch != autoSearch)
+                {
+                    EditorPrefs.SetBool(PREFS_KEY_AUTO_SEARCH, newAutoSearch);
+                }
 
                 EditorGUILayout.EndVertical();
             }

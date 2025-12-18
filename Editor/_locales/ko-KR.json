@@ -23,6 +23,8 @@
   "remove": "삭제",
   "update_database": "데이터베이스 업데이트",
   "database_settings": "데이터베이스 설정",
+  "search_settings": "검색 설정",
+  "auto_search": "입력 시 자동 검색",
   "display_size_settings": "표시 크기 설정",
   "category_settings": "카테고리 설정",
   "folder_thumbnail_settings": "폴더 썸네일 설정",

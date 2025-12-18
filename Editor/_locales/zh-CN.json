@@ -23,6 +23,8 @@
   "remove": "删除",
   "update_database": "更新数据库",
   "database_settings": "数据库设置",
+  "search_settings": "搜索设置",
+  "auto_search": "输入时自动搜索",
   "display_size_settings": "显示大小设置",
   "category_settings": "分类设置",
   "folder_thumbnail_settings": "文件夹缩略图设置",

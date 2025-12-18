@@ -23,6 +23,8 @@
   "remove": "Remove",
   "update_database": "Update Database",
   "database_settings": "Database Settings",
+  "search_settings": "Search Settings",
+  "auto_search": "Search automatically on input",
   "display_size_settings": "Display Size Settings",
   "category_settings": "Category Settings",
   "folder_thumbnail_settings": "Folder Thumbnail Settings",

@@ -23,6 +23,8 @@
   "remove": "削除",
   "update_database": "更新",
   "database_settings": "データベース設定",
+  "search_settings": "検索設定",
+  "auto_search": "入力時に自動で検索する",
   "display_size_settings": "表示サイズ設定",
   "category_settings": "カテゴリ設定",
   "folder_thumbnail_settings": "フォルダサムネイル設定",
