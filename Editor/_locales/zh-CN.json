@@ -119,5 +119,13 @@
   "error_package_import_failed": "包导入失败: {0}",
   "error_large_image_load_failed": "加载大图像失败 {0}: {1}",
   "error_texture_creation_failed": "创建纹理失败 {0}: {1}",
-  "category_avatar": "形象"
+  "category_avatar": "形象",
+  "add_to_import_list": "添加到导入列表",
+  "import_list": "导入列表",
+  "start_import": "开始批量导入",
+  "clear_list": "清空列表",
+  "import_completed": "导入完成",
+  "importing": "正在导入...",
+  "show_import_dialog": "导入时显示确认对话框",
+  "dialog_info": "无论此设置如何，批量导入期间都不会显示对话框。"
 }

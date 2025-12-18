@@ -11,6 +11,7 @@ using UnityEditor;
 using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
+using UnityEditorAssetBrowser.Windows;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Views
@@ -345,11 +346,13 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             GUIContent labelContent = new GUIContent(displayLabel, tooltip);
+            Rect labelRect;
 
             if (isMultiLine)
             {
                 GUILayout.BeginVertical();
                 GUILayout.Label(labelContent, GUIStyleManager.Label);
+                labelRect = GUILayoutUtility.GetLastRect();
                 GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
                 GUILayout.FlexibleSpace();
             }
@@ -357,7 +360,24 @@ namespace UnityEditorAssetBrowser.Views
             {
                 GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
                 GUILayout.Label(labelContent, GUIStyleManager.Label);
+                labelRect = GUILayoutUtility.GetLastRect();
                 GUILayout.FlexibleSpace();
+            }
+
+            // ドラッグ開始処理
+            if (Event.current.type == EventType.MouseDrag && labelRect.Contains(Event.current.mousePosition))
+            {
+                DragAndDrop.PrepareStartDrag();
+                var item = new Models.ImportQueueItem
+                {
+                    PackagePath = package,
+                    PackageName = Path.GetFileName(package),
+                    ThumbnailPath = imagePath,
+                    Category = category
+                };
+                DragAndDrop.SetGenericData("ImportQueueItem", item);
+                DragAndDrop.StartDrag(item.PackageName);
+                Event.current.Use();
             }
 
             // ボタンの矩形を確保
@@ -372,6 +392,27 @@ namespace UnityEditorAssetBrowser.Views
                     UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true));
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_directly")), false, () => 
                     UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false));
+                
+                menu.AddSeparator("");
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
+                {
+                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
+                    ImportQueueWindow.ShowWindow();
+                });
+
+                menu.ShowAsContext();
+                Event.current.Use();
+            }
+
+            // ラベル上での右クリックメニュー
+            if (Event.current.type == EventType.ContextClick && labelRect.Contains(Event.current.mousePosition))
+            {
+                var menu = new GenericMenu();
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
+                {
+                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
+                    ImportQueueWindow.ShowWindow();
+                });
                 menu.ShowAsContext();
                 Event.current.Use();
             }

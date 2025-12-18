@@ -80,6 +80,7 @@ namespace UnityEditorAssetBrowser.Views
         private const string PREFS_KEY_ICON_SIZE = "UnityEditorAssetBrowser_IconSize";
         private const string PREFS_KEY_FONT_SIZE = "UnityEditorAssetBrowser_FontSize";
         private const string PREFS_KEY_AUTO_SEARCH = "UnityEditorAssetBrowser_AutoSearch";
+        public const string PREFS_KEY_SHOW_IMPORT_DIALOG = "UnityEditorAssetBrowser_ShowImportDialog";
 
         // 表示サイズ設定
         private bool _showDisplaySizeSettings = false;
@@ -645,6 +646,24 @@ namespace UnityEditorAssetBrowser.Views
             {
                 EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
+                // ダイアログ表示設定
+                bool showImportDialog = EditorPrefs.GetBool(PREFS_KEY_SHOW_IMPORT_DIALOG, true);
+                bool newShowImportDialog = EditorGUILayout.ToggleLeft(
+                    LocalizationService.Instance.GetString("show_import_dialog"),
+                    showImportDialog,
+                    GUIStyleManager.Label
+                );
+
+                if (newShowImportDialog != showImportDialog)
+                {
+                    EditorPrefs.SetBool(PREFS_KEY_SHOW_IMPORT_DIALOG, newShowImportDialog);
+                }
+
+                EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("dialog_info"), MessageType.Info);
+
+                EditorGUILayout.Space(5);
+
+                // カテゴリフォルダインポート設定
                 bool importToCategoryFolder = EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
                 bool newValue = EditorGUILayout.ToggleLeft(
                     LocalizationService.Instance.GetString("import_to_category_folder_long"),

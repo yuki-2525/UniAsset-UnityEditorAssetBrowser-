@@ -119,5 +119,13 @@
   "error_package_import_failed": "パッケージのインポートに失敗しました: {0}",
   "error_large_image_load_failed": "Large image load failed for {0}: {1}",
   "error_texture_creation_failed": "Texture creation failed for {0}: {1}",
-  "category_avatar": "アバター"
+  "category_avatar": "アバター",
+  "add_to_import_list": "インポートリストに追加",
+  "import_list": "インポートリスト",
+  "start_import": "一括インポート開始",
+  "clear_list": "リストをクリア",
+  "import_completed": "インポート完了",
+  "importing": "インポート中...",
+  "show_import_dialog": "インポート時に確認ダイアログを表示",
+  "dialog_info": "この設定に関わらず、一括インポート時はダイアログが表示されません"
 }

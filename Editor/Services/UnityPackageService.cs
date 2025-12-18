@@ -20,6 +20,7 @@ namespace UnityEditorAssetBrowser.Services
     {
         private const string PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER = "UnityEditorAssetBrowser_ImportToCategoryFolder";
         private const string PREFS_KEY_GENERATE_FOLDER_THUMBNAIL = "UnityEditorAssetBrowser_GenerateFolderThumbnail";
+        private const string PREFS_KEY_SHOW_IMPORT_DIALOG = "UnityEditorAssetBrowser_ShowImportDialog";
 
         /// <summary>
         /// 指定されたディレクトリ内のUnityPackageファイルを検索する
@@ -65,7 +66,15 @@ namespace UnityEditorAssetBrowser.Services
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="category">カテゴリ</param>
         /// <param name="forceImportToCategoryFolder">カテゴリフォルダへのインポートを強制するかどうか（nullの場合は設定に従う）</param>
-        public static async void ImportPackageAndSetThumbnails(string packagePath, string imagePath, string category, bool? forceImportToCategoryFolder = null)
+        /// <param name="showDialog">インポートダイアログを表示するかどうか（nullの場合は設定に従う）</param>
+        /// <param name="onPreImportError">インポート開始前のエラー通知コールバック</param>
+        public static async void ImportPackageAndSetThumbnails(
+            string packagePath, 
+            string imagePath, 
+            string category, 
+            bool? forceImportToCategoryFolder = null,
+            bool? showDialog = null,
+            Action<string>? onPreImportError = null)
         {
             bool generateThumbnail = EditorPrefs.GetBool(PREFS_KEY_GENERATE_FOLDER_THUMBNAIL, true);
             var beforeFolders = generateThumbnail ? GetAssetFolders() : new List<string>();
@@ -102,11 +111,15 @@ namespace UnityEditorAssetBrowser.Services
                 // サムネイル生成もパッケージ変更も不要なら、単純にインポートして終了
                 if (!generateThumbnail && !isModified)
                 {
-                    AssetDatabase.ImportPackage(pathToImport, true);
+                    bool dialog = showDialog ?? EditorPrefs.GetBool(PREFS_KEY_SHOW_IMPORT_DIALOG, true);
+                    AssetDatabase.ImportPackage(pathToImport, dialog);
                     return;
                 }
 
-                AssetDatabase.ImportPackage(pathToImport, true);
+                {
+                    bool dialog = showDialog ?? EditorPrefs.GetBool(PREFS_KEY_SHOW_IMPORT_DIALOG, true);
+                    AssetDatabase.ImportPackage(pathToImport, dialog);
+                }
 
                 // イベントハンドラの解除ヘルパー
                 void UnregisterHandlers()
@@ -203,7 +216,9 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_package_import_failed"), ex.Message));
+                string errorMessage = string.Format(LocalizationService.Instance.GetString("error_package_import_failed"), ex.Message);
+                Debug.LogError(errorMessage);
+                onPreImportError?.Invoke(errorMessage);
             }
         }
 

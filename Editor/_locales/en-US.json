@@ -119,5 +119,13 @@
   "error_package_import_failed": "Failed to import package: {0}",
   "error_large_image_load_failed": "Large image load failed for {0}: {1}",
   "error_texture_creation_failed": "Texture creation failed for {0}: {1}",
-  "category_avatar": "Avatar"
+  "category_avatar": "Avatar",
+  "add_to_import_list": "Add to Import List",
+  "import_list": "Import List",
+  "start_import": "Start Batch Import",
+  "clear_list": "Clear List",
+  "import_completed": "Import Completed",
+  "importing": "Importing...",
+  "show_import_dialog": "Show confirmation dialog on import",
+  "dialog_info": "Regardless of this setting, the dialog will not be shown during batch import."
 }
