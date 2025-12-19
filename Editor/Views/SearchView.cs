@@ -277,10 +277,15 @@ namespace UnityEditorAssetBrowser.Views
 
             GUILayout.FlexibleSpace();
 
-            // 追加: このソフトについてボタン
+            // このソフトについてボタン
             if (GUILayout.Button(LocalizationService.Instance.GetString("about"), GUIStyleManager.Button))
             {
                 AboutWindow.ShowWindow();
+            }
+
+            if (GUILayout.Button(LocalizationService.Instance.GetString("open_import_list"), GUIStyleManager.Button))
+            {
+                ImportQueueWindow.ShowWindow();
             }
 
             if (GUILayout.Button(LocalizationService.Instance.GetString("settings"), GUIStyleManager.Button))

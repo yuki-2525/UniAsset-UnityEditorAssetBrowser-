@@ -54,7 +54,7 @@ namespace UnityEditorAssetBrowser
         public static void ShowWindow()
         {
             var window = GetWindow<UnityEditorAssetBrowser>();
-            window.titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title"));
+            window.titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
             window.Show();
         }
 
@@ -63,7 +63,7 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnEnable()
         {
-            titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title"));
+            titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
             LocalizationService.Instance.OnLanguageChanged += UpdateTitle;
 
             // 除外フォルダ初期化と合成済みリスト保存

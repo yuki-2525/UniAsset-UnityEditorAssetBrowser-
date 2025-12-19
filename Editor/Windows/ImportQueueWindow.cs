@@ -22,7 +22,7 @@ namespace UnityEditorAssetBrowser.Windows
         public static void ShowWindow()
         {
             var window = GetWindow<ImportQueueWindow>();
-            window.titleContent = new GUIContent(LocalizationService.Instance.GetString("import_list") ?? "Import List");
+            window.titleContent = new GUIContent("Import List");
             window.Show();
         }
 
@@ -125,6 +125,8 @@ namespace UnityEditorAssetBrowser.Windows
             }
 
             EditorGUILayout.EndScrollView();
+
+            EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("import_list_help") ?? "You can add items to this list by right-clicking a unitypackage or by dragging and dropping it here.", MessageType.Info);
 
             GUILayout.BeginHorizontal();
             

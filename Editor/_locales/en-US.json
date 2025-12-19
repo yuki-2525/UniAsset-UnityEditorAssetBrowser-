@@ -127,5 +127,7 @@
   "import_completed": "Import Completed",
   "importing": "Importing...",
   "show_import_dialog": "Show confirmation dialog on import",
-  "dialog_info": "Regardless of this setting, the dialog will not be shown during batch import."
+  "dialog_info": "Regardless of this setting, the dialog will not be shown during batch import.",
+  "open_import_list": "Open Import List",
+  "import_list_help": "You can add items to this list by right-clicking a unitypackage or by dragging and dropping it here."
 }
