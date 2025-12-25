@@ -234,7 +234,9 @@ namespace UnityEditorAssetBrowser.Views
         {
             if (string.IsNullOrEmpty(imagePath)) return;
 
-            if (File.Exists(imagePath))
+            // URLまたはローカルファイルパスのチェック
+            bool isUrl = imagePath.StartsWith("http://") || imagePath.StartsWith("https://");
+            if (isUrl || File.Exists(imagePath))
             {
                 var texture = ImageServices.Instance.LoadTexture(imagePath);
                 if (texture == null) return;
@@ -270,8 +272,8 @@ namespace UnityEditorAssetBrowser.Views
             var parts = directory.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
             string labelText;
 
-            // 親フォルダの1つ上がUUID（GUID）形式の場合は、冗長なので表示を省略する
-            if (parts.Length >= 2 && Guid.TryParse(parts[parts.Length - 2], out _))
+            // 親フォルダの1つ上がUUID（GUID）形式、または英小文字+数字形式の場合は、冗長なので表示を省略する
+            if (parts.Length >= 2 && (Guid.TryParse(parts[parts.Length - 2], out _) || System.Text.RegularExpressions.Regex.IsMatch(parts[parts.Length - 2], @"^[a-z]\d+$")))
             {
                 labelText = parts.Last() + "/" + Path.GetFileName(package);
             }

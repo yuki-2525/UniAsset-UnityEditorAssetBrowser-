@@ -9,6 +9,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -79,8 +80,24 @@ namespace UnityEditorAssetBrowser.Services
             bool generateThumbnail = EditorPrefs.GetBool(PREFS_KEY_GENERATE_FOLDER_THUMBNAIL, true);
             var beforeFolders = generateThumbnail ? GetAssetFolders() : new List<string>();
 
+            string processedImagePath = imagePath;
+            string? tempImagePath = null;
+
             try
             {
+                if (generateThumbnail && IsUrl(imagePath))
+                {
+                    try
+                    {
+                        processedImagePath = await DownloadAndResizeImageAsync(imagePath);
+                        tempImagePath = processedImagePath;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
+                    }
+                }
+
                 bool importToCategoryFolder = forceImportToCategoryFolder ?? EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
                 string pathToImport = packagePath;
                 bool isModified = false;
@@ -157,14 +174,24 @@ namespace UnityEditorAssetBrowser.Services
                             Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_delete_temp_package_failed"), pathToImport, ex.Message));
                         }
                     }
+
+                    if (!string.IsNullOrEmpty(tempImagePath) && File.Exists(tempImagePath))
+                    {
+                        try
+                        {
+                            File.Delete(tempImagePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
+                        }
+                    }
                 }
 
                 _importCompletedHandler = packageName =>
                 {
                     try
                     {
-                        DeleteTempPackage();
-
                         if (generateThumbnail)
                         {
                             // アセットデータベースを更新
@@ -179,7 +206,7 @@ namespace UnityEditorAssetBrowser.Services
                             // サムネイルの設定
                             if (newFolders.Any())
                             {
-                                SetFolderThumbnails(newFolders, imagePath);
+                                SetFolderThumbnails(newFolders, processedImagePath);
                             }
                             else
                             {
@@ -193,6 +220,7 @@ namespace UnityEditorAssetBrowser.Services
                     }
                     finally
                     {
+                        DeleteTempPackage();
                         UnregisterHandlers();
                     }
                 };
@@ -579,6 +607,75 @@ namespace UnityEditorAssetBrowser.Services
             }
 
             return common.Count > 0 ? string.Join("/", common) : string.Empty;
+        }
+
+        private static bool IsUrl(string path)
+        {
+            return !string.IsNullOrEmpty(path) && (path.StartsWith("http://") || path.StartsWith("https://"));
+        }
+
+        private static async Task<string> DownloadAndResizeImageAsync(string url)
+        {
+            using (var uwr = UnityWebRequestTexture.GetTexture(url))
+            {
+                var operation = uwr.SendWebRequest();
+                while (!operation.isDone)
+                    await Task.Delay(10);
+
+                if (uwr.result != UnityWebRequest.Result.Success)
+                {
+                    throw new Exception($"Failed to download image: {uwr.error}");
+                }
+
+                Texture2D texture = DownloadHandlerTexture.GetContent(uwr);
+                if (texture == null) throw new Exception("Failed to get texture content");
+
+                try
+                {
+                    // Resize if needed
+                    int targetWidth = 300;
+                    int targetHeight = texture.height;
+                    
+                    if (texture.width > targetWidth)
+                    {
+                        float scale = (float)targetWidth / texture.width;
+                        targetHeight = Mathf.RoundToInt(texture.height * scale);
+                    }
+                    else
+                    {
+                        targetWidth = texture.width;
+                    }
+
+                    RenderTexture rt = RenderTexture.GetTemporary(targetWidth, targetHeight, 0);
+                    RenderTexture.active = rt;
+                    Graphics.Blit(texture, rt);
+                    
+                    Texture2D result = new Texture2D(targetWidth, targetHeight, TextureFormat.RGB24, false);
+                    result.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+                    result.Apply();
+                    
+                    RenderTexture.active = null;
+                    RenderTexture.ReleaseTemporary(rt);
+
+                    byte[] bytes = result.EncodeToJPG(75);
+                    string tempPath = Path.Combine(Application.temporaryCachePath, "temp_thumbnail_" + Guid.NewGuid() + ".jpg");
+                    File.WriteAllBytes(tempPath, bytes);
+                    
+                    if (Application.isPlaying)
+                        UnityEngine.Object.Destroy(result);
+                    else
+                        UnityEngine.Object.DestroyImmediate(result);
+
+                    return tempPath;
+                }
+                finally
+                {
+                    if (Application.isPlaying)
+                        UnityEngine.Object.Destroy(texture);
+                    else
+                        UnityEngine.Object.DestroyImmediate(texture);
+                }
+            }
         }
 
         [Serializable]
