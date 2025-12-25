@@ -25,13 +25,16 @@ namespace UnityEditorAssetBrowser.ViewModels
     {
         // イベント定義
         public event Action? SortMethodChanged;
+#pragma warning disable 67
         public event Action<string>? ErrorOccurred;
+#pragma warning restore 67
 
         private AvatarExplorerDatabase? _aeDatabase;
         private KonoAssetAvatarsDatabase? _kaAvatarsDatabase;
         private KonoAssetWearablesDatabase? _kaWearablesDatabase;
         private KonoAssetWorldObjectsDatabase? _kaWorldObjectsDatabase;
         private KonoAssetOtherAssetsDatabase? _kaOtherAssetsDatabase;
+        private BOOTHLMDatabase? _boothlmDatabase;
         private readonly PaginationInfo _paginationInfo;
         private SortMethod _currentSortMethod = SortMethod.CreatedDateDesc;
         private readonly SearchViewModel _searchViewModel;
@@ -47,6 +50,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             KonoAssetWearablesDatabase? kaWearablesDatabase,
             KonoAssetWorldObjectsDatabase? kaWorldObjectsDatabase,
             KonoAssetOtherAssetsDatabase? kaOtherAssetsDatabase,
+            BOOTHLMDatabase? boothlmDatabase,
             PaginationInfo paginationInfo,
             SearchViewModel searchViewModel
         )
@@ -56,6 +60,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             _kaWearablesDatabase = kaWearablesDatabase;
             _kaWorldObjectsDatabase = kaWorldObjectsDatabase;
             _kaOtherAssetsDatabase = kaOtherAssetsDatabase;
+            _boothlmDatabase = boothlmDatabase;
             _paginationInfo = paginationInfo;
             _searchViewModel = searchViewModel;
             _currentSortMethod = SortMethod.CreatedDateDesc; // デフォルト値を設定
@@ -97,6 +102,27 @@ namespace UnityEditorAssetBrowser.ViewModels
         }
 
         /// <summary>
+        /// BOOTHLMカテゴリのアセットタイプを取得
+        /// </summary>
+        private int GetBOOTHLMAssetType(string category)
+        {
+            var key = "UnityEditorAssetBrowser_BOOTHLMCategoryAssetType_" + category;
+            if (EditorPrefs.HasKey(key))
+            {
+                return EditorPrefs.GetInt(key);
+            }
+
+            // デフォルトの判定ロジック
+            if (category.Contains("3D Characters") || category.Contains("3Dキャラクター") || category.Contains("Avatar") || category.Contains("アバター"))
+                return (int)AssetTypeConstants.Avatar;
+            if (category.Contains("3D Costumes") || category.Contains("3D衣装") || category.Contains("3D Accessories") || category.Contains("3D装飾品") || category.Contains("Fashion") || category.Contains("ファッション"))
+                return (int)AssetTypeConstants.AvatarRelated;
+            if (category.Contains("3D Environments") || category.Contains("3D環境") || category.Contains("World") || category.Contains("ワールド"))
+                return (int)AssetTypeConstants.World;
+            return (int)AssetTypeConstants.Other;
+        }
+
+        /// <summary>
         /// フィルターされたアバターリストを取得
         /// </summary>
         /// <returns>フィルターされたアバターリスト</returns>
@@ -127,6 +153,16 @@ namespace UnityEditorAssetBrowser.ViewModels
                 items.AddRange(_kaAvatarsDatabase.Data);
             }
 
+            // BOOTHLMのアバターを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.Avatar
+                    )
+                );
+            }
+
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
         }
 
@@ -154,9 +190,20 @@ namespace UnityEditorAssetBrowser.ViewModels
                 );
             }
             
+            // KAの衣装を追加
             if (_kaWearablesDatabase != null)
             {
                 items.AddRange(_kaWearablesDatabase.Data);
+            }
+
+            // BOOTHLMのアイテムを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.AvatarRelated
+                    )
+                );
             }
 
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
@@ -194,6 +241,16 @@ namespace UnityEditorAssetBrowser.ViewModels
                 items.AddRange(_kaWorldObjectsDatabase.Data);
             }
 
+            // BOOTHLMのワールドオブジェクトを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.World
+                    )
+                );
+            }
+
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
         }
 
@@ -229,6 +286,16 @@ namespace UnityEditorAssetBrowser.ViewModels
             if (_kaOtherAssetsDatabase?.Data != null)
             {
                 items.AddRange(_kaOtherAssetsDatabase.Data);
+            }
+
+            // BOOTHLMのその他アセットを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.Other
+                    )
+                );
             }
 
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
@@ -274,33 +341,18 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// </summary>
         private void SaveSortMethod()
         {
-            EditorPrefs.SetInt(
-                $"AssetBrowser_SortMethod_{_paginationInfo.SelectedTab}",
-                (int)_currentSortMethod
-            );
+            EditorPrefs.SetInt("UnityEditorAssetBrowser_SortMethod", (int)_currentSortMethod);
         }
 
         /// <summary>
-        /// 保存されたソート方法を読み込む
+        /// ソート方法を読み込む
         /// </summary>
         private void LoadSortMethod()
         {
-            _currentSortMethod = (SortMethod)
-                EditorPrefs.GetInt(
-                    $"AssetBrowser_SortMethod_{_paginationInfo.SelectedTab}",
-                    (int)SortMethod.CreatedDateDesc
-                );
-        }
-
-        /// <summary>
-        /// エラーを処理する
-        /// </summary>
-        /// <param name="message">エラーメッセージ</param>
-        private void HandleError(string message)
-        {
-            _lastError = message;
-            ErrorOccurred?.Invoke(message);
-            Debug.LogError(message);
+            if (EditorPrefs.HasKey("UnityEditorAssetBrowser_SortMethod"))
+            {
+                _currentSortMethod = (SortMethod)EditorPrefs.GetInt("UnityEditorAssetBrowser_SortMethod");
+            }
         }
 
         /// <summary>
@@ -339,7 +391,8 @@ namespace UnityEditorAssetBrowser.ViewModels
             KonoAssetAvatarsDatabase? kaAvatarsDatabase,
             KonoAssetWearablesDatabase? kaWearablesDatabase,
             KonoAssetWorldObjectsDatabase? kaWorldObjectsDatabase,
-            KonoAssetOtherAssetsDatabase? kaOtherAssetsDatabase
+            KonoAssetOtherAssetsDatabase? kaOtherAssetsDatabase,
+            BOOTHLMDatabase? boothlmDatabase
         )
         {
             // データベースがnullの場合は、即座に更新を完了
@@ -349,6 +402,7 @@ namespace UnityEditorAssetBrowser.ViewModels
                 && kaWearablesDatabase == null
                 && kaWorldObjectsDatabase == null
                 && kaOtherAssetsDatabase == null
+                && boothlmDatabase == null
             )
             {
                 _aeDatabase = null;
@@ -356,6 +410,7 @@ namespace UnityEditorAssetBrowser.ViewModels
                 _kaWearablesDatabase = null;
                 _kaWorldObjectsDatabase = null;
                 _kaOtherAssetsDatabase = null;
+                _boothlmDatabase = null;
                 return;
             }
 
@@ -364,6 +419,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             _kaWearablesDatabase = kaWearablesDatabase;
             _kaWorldObjectsDatabase = kaWorldObjectsDatabase;
             _kaOtherAssetsDatabase = kaOtherAssetsDatabase;
+            _boothlmDatabase = boothlmDatabase;
         }
     }
 }

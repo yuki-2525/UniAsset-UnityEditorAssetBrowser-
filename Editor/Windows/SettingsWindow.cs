@@ -40,7 +40,8 @@ namespace UnityEditorAssetBrowser.Windows
         {
             _settingsView = new SettingsView(
                 DatabaseService.OnAEDatabasePathChanged,
-                DatabaseService.OnKADatabasePathChanged
+                DatabaseService.OnKADatabasePathChanged,
+                DatabaseService.OnBOOTHLMDatabasePathChanged
             );
 
             _settingsView.OnSettingsChanged += () =>

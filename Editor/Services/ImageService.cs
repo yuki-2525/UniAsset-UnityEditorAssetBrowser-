@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEngine;
+using UnityEngine.Networking;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -85,6 +86,13 @@ namespace UnityEditorAssetBrowser.Services
                 // LRU更新: 最近使用したアイテムをリストの末尾に移動
                 UpdateAccessOrder(path);
                 return cachedTexture;
+            }
+
+            // URLの場合は非同期読み込みを開始してプレースホルダーを返す
+            if (path.StartsWith("http://") || path.StartsWith("https://"))
+            {
+                LoadTextureAsync(path, priority: 1);
+                return _placeholderTexture;
             }
 
             // 即座に同期読み込みを試行（小さいファイル用）
@@ -247,16 +255,51 @@ namespace UnityEditorAssetBrowser.Services
                 onComplete?.Invoke(cachedTexture);
                 return;
             }
-
-            // 既に読み込み中の場合はスキップ
-            if (_loadingImages.Contains(path))
-            {
-                return;
-            }
-
-            // 大きいファイルは直接Task.Runで処理（EditorCoroutineより高速）
             _loadingImages.Add(path);
-            Task.Run(() => LoadLargeImageAsync(path, onComplete));
+
+            if (path.StartsWith("http://") || path.StartsWith("https://"))
+            {
+                LoadUrlImage(path, onComplete);
+            }
+            else
+            {
+                // 大きいファイルは直接Task.Runで処理（EditorCoroutineより高速）
+                Task.Run(() => LoadLargeImageAsync(path, onComplete));
+            }
+        }
+
+        /// <summary>
+        /// URLから画像を読み込む
+        /// </summary>
+        private void LoadUrlImage(string url, Action<Texture2D?>? onComplete)
+        {
+            _mainThreadQueue.Enqueue(async () =>
+            {
+                using (var uwr = UnityWebRequestTexture.GetTexture(url))
+                {
+                    var op = uwr.SendWebRequest();
+                    while (!op.isDone) await Task.Yield();
+
+                    if (uwr.result != UnityWebRequest.Result.Success)
+                    {
+                        // Debug.LogWarning($"Failed to download image: {url}\n{uwr.error}");
+                        _loadingImages.Remove(url);
+                        onComplete?.Invoke(null);
+                    }
+                    else
+                    {
+                        var texture = DownloadHandlerTexture.GetContent(uwr);
+                        if (texture != null)
+                        {
+                            AddToCache(url, texture);
+                        }
+                        _loadingImages.Remove(url);
+                        onComplete?.Invoke(texture);
+
+                        if (EditorWindow.focusedWindow != null) EditorWindow.focusedWindow.Repaint();
+                    }
+                }
+            });
         }
 
         /// <summary>
@@ -324,9 +367,12 @@ namespace UnityEditorAssetBrowser.Services
             {
                 string imagePath = item.GetImagePath();
 
-                if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+                if (!string.IsNullOrEmpty(imagePath))
                 {
-                    LoadTexture(imagePath);
+                    if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://") || File.Exists(imagePath))
+                    {
+                        LoadTexture(imagePath);
+                    }
                 }
             }
         }
@@ -349,9 +395,12 @@ namespace UnityEditorAssetBrowser.Services
                     newVisibleImages.Add(imagePath);
 
                     // まだキャッシュにない場合のみ読み込み
-                    if (!ImageCache.ContainsKey(imagePath) && File.Exists(imagePath))
+                    if (!ImageCache.ContainsKey(imagePath))
                     {
-                        LoadTexture(imagePath);
+                        if (imagePath.StartsWith("http://") || imagePath.StartsWith("https://") || File.Exists(imagePath))
+                        {
+                            LoadTexture(imagePath);
+                        }
                     }
                 }
             }

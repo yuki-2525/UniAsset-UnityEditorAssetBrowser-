@@ -32,6 +32,11 @@ namespace UnityEditorAssetBrowser.Services
         private const string KA_DATABASE_PATH_KEY = "UnityEditorAssetBrowser_KADatabasePath";
 
         /// <summary>
+        /// BOOTHLMデータベースパスのEditorPrefsキー
+        /// </summary>
+        private const string BOOTHLM_DATABASE_PATH_KEY = "UnityEditorAssetBrowser_BOOTHLMDatabasePath";
+
+        /// <summary>
         /// AvatarExplorerデータベースのパス
         /// </summary>
         private static string _aeDatabasePath = "";
@@ -40,6 +45,11 @@ namespace UnityEditorAssetBrowser.Services
         /// KonoAssetデータベースのパス
         /// </summary>
         private static string _kaDatabasePath = "";
+
+        /// <summary>
+        /// BOOTHLMデータベースのパス（データ保存先）
+        /// </summary>
+        private static string _boothlmDatabasePath = "";
 
         /// <summary>
         /// AvatarExplorerのデータベース
@@ -65,6 +75,11 @@ namespace UnityEditorAssetBrowser.Services
         /// KonoAssetのその他アセットデータベース
         /// </summary>
         private static KonoAssetOtherAssetsDatabase? _kaOtherAssetsDatabase;
+
+        /// <summary>
+        /// BOOTHLMのデータベース
+        /// </summary>
+        private static BOOTHLMDatabase? _boothlmDatabase;
 
         private static AssetBrowserViewModel? _assetBrowserViewModel;
         private static SearchViewModel? _searchViewModel;
@@ -92,9 +107,11 @@ namespace UnityEditorAssetBrowser.Services
         {
             _aeDatabasePath = EditorPrefs.GetString(AE_DATABASE_PATH_KEY, "");
             _kaDatabasePath = EditorPrefs.GetString(KA_DATABASE_PATH_KEY, "");
+            _boothlmDatabasePath = EditorPrefs.GetString(BOOTHLM_DATABASE_PATH_KEY, "");
 
             if (!string.IsNullOrEmpty(_aeDatabasePath)) LoadAEDatabase();
             if (!string.IsNullOrEmpty(_kaDatabasePath)) LoadKADatabase();
+            if (!string.IsNullOrEmpty(_boothlmDatabasePath)) LoadBOOTHLMDatabase();
         }
 
         /// <summary>
@@ -105,6 +122,7 @@ namespace UnityEditorAssetBrowser.Services
         {
             EditorPrefs.SetString(AE_DATABASE_PATH_KEY, _aeDatabasePath);
             EditorPrefs.SetString(KA_DATABASE_PATH_KEY, _kaDatabasePath);
+            EditorPrefs.SetString(BOOTHLM_DATABASE_PATH_KEY, _boothlmDatabasePath);
         }
 
         /// <summary>
@@ -142,7 +160,8 @@ namespace UnityEditorAssetBrowser.Services
                     GetKAAvatarsDatabase(),
                     GetKAWearablesDatabase(),
                     GetKAWorldObjectsDatabase(),
-                    GetKAOtherAssetsDatabase()
+                    GetKAOtherAssetsDatabase(),
+                    GetBOOTHLMDatabase()
                 );
                 _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
             }
@@ -189,7 +208,45 @@ namespace UnityEditorAssetBrowser.Services
                     GetKAAvatarsDatabase(),
                     GetKAWearablesDatabase(),
                     GetKAWorldObjectsDatabase(),
-                    GetKAOtherAssetsDatabase()
+                    GetKAOtherAssetsDatabase(),
+                    GetBOOTHLMDatabase()
+                );
+                _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
+            }
+        }
+
+        /// <summary>
+        /// BOOTHLMデータベースを読み込み、更新する
+        /// data.dbのパスは固定
+        /// </summary>
+        public static void LoadBOOTHLMDatabase()
+        {
+            // データベースをクリア
+            ClearBOOTHLMDatabase();
+
+            // data.dbのパスは固定
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            string dbPath = Path.Combine(appDataPath, "pm.booth.library-manager", "data.db");
+
+            if (File.Exists(dbPath))
+            {
+                _boothlmDatabase = BOOTHLMDatabaseHelper.LoadBOOTHLMDatabase(dbPath);
+            }
+            
+            // データベースを更新
+            if (
+                _assetBrowserViewModel != null
+                && _searchViewModel != null
+                && _paginationViewModel != null
+            )
+            {
+                _assetBrowserViewModel.UpdateDatabases(
+                    GetAEDatabase(),
+                    GetKAAvatarsDatabase(),
+                    GetKAWearablesDatabase(),
+                    GetKAWorldObjectsDatabase(),
+                    GetKAOtherAssetsDatabase(),
+                    GetBOOTHLMDatabase()
                 );
                 _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
             }
@@ -225,7 +282,8 @@ namespace UnityEditorAssetBrowser.Services
                         GetKAAvatarsDatabase(),
                         GetKAWearablesDatabase(),
                         GetKAWorldObjectsDatabase(),
-                        GetKAOtherAssetsDatabase()
+                        GetKAOtherAssetsDatabase(),
+                        GetBOOTHLMDatabase()
                     );
                     // SetCurrentTabは呼ばない
                 }
@@ -253,7 +311,7 @@ namespace UnityEditorAssetBrowser.Services
                     && _paginationViewModel != null
                 )
                 {
-                    _assetBrowserViewModel.UpdateDatabases(GetAEDatabase(), null, null, null, null);
+                    _assetBrowserViewModel.UpdateDatabases(GetAEDatabase(), null, null, null, null, GetBOOTHLMDatabase());
                     // SetCurrentTabは呼ばない
                 }
             }
@@ -261,6 +319,19 @@ namespace UnityEditorAssetBrowser.Services
             {
                 LoadKADatabase();
             }
+
+            SaveSettings();
+            OnPathChanged?.Invoke();
+        }
+
+        public static void OnBOOTHLMDatabasePathChanged(string path)
+        {
+            SetBOOTHLMDatabasePath(path);
+            
+            // パスが変わってもDBの再読み込みは不要（DBパスは固定だから）
+            // ただし、GetItemPathの結果が変わるため、ビューの更新は必要
+            // LoadBOOTHLMDatabaseを呼ぶことでUpdateDatabasesが走り、ビューが更新される
+            LoadBOOTHLMDatabase();
 
             SaveSettings();
             OnPathChanged?.Invoke();
@@ -285,6 +356,13 @@ namespace UnityEditorAssetBrowser.Services
             => _kaDatabasePath;
 
         /// <summary>
+        /// BOOTHLMデータベースのパス（データ保存先）を取得する
+        /// </summary>
+        /// <returns>データベースのパス</returns>
+        public static string GetBOOTHLMDataPath()
+            => _boothlmDatabasePath;
+
+        /// <summary>
         /// AvatarExplorerデータベースのパスを設定する
         /// </summary>
         /// <param name="path">設定するパス</param>
@@ -297,6 +375,13 @@ namespace UnityEditorAssetBrowser.Services
         /// <param name="path">設定するパス</param>
         public static void SetKADatabasePath(string path)
             => _kaDatabasePath = path;
+
+        /// <summary>
+        /// BOOTHLMデータベースのパス（データ保存先）を設定する
+        /// </summary>
+        /// <param name="path">設定するパス</param>
+        public static void SetBOOTHLMDatabasePath(string path)
+            => _boothlmDatabasePath = path;
 
         /// <summary>
         /// AvatarExplorerデータベースを取得する
@@ -334,6 +419,13 @@ namespace UnityEditorAssetBrowser.Services
             => _kaOtherAssetsDatabase;
 
         /// <summary>
+        /// BOOTHLMデータベースを取得する
+        /// </summary>
+        /// <returns>データベース（存在しない場合はnull）</returns>
+        public static BOOTHLMDatabase? GetBOOTHLMDatabase()
+            => _boothlmDatabase;
+
+        /// <summary>
         /// AvatarExplorerデータベースをクリアする
         /// </summary>
         public static void ClearAEDatabase()
@@ -349,5 +441,11 @@ namespace UnityEditorAssetBrowser.Services
             _kaWorldObjectsDatabase = null;
             _kaOtherAssetsDatabase = null;
         }
+
+        /// <summary>
+        /// BOOTHLMデータベースをクリアする
+        /// </summary>
+        public static void ClearBOOTHLMDatabase()
+            => _boothlmDatabase = null;
     }
 }

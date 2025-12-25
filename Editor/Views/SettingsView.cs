@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Helper;
+using UnityEditorAssetBrowser.Models;
 using UnityEditorAssetBrowser.Services;
 using UnityEngine;
 
@@ -18,6 +19,7 @@ namespace UnityEditorAssetBrowser.Views
     {
         private readonly Action<string> _onAEDatabasePathChanged;
         private readonly Action<string> _onKADatabasePathChanged;
+        private readonly Action<string> _onBOOTHLMDataPathChanged;
         
         /// <summary>
         /// 設定が変更された時に発生するイベント
@@ -27,6 +29,7 @@ namespace UnityEditorAssetBrowser.Views
         private Vector2 _categoryScrollPosition;
         private bool _showDatabaseSettings;
         private bool _showCategorySettings;
+        private bool _showBOOTHLMCategories;
         private bool _showFolderThumbnailSettings = false;
         private bool _showImportSettings = false;
         private List<string> _userExcludeFolders;
@@ -68,9 +71,15 @@ namespace UnityEditorAssetBrowser.Views
         private readonly Dictionary<string, int> _categoryAssetTypes = new Dictionary<string, int>();
 
         /// <summary>
+        /// BOOTHLMのカテゴリごとのアセットタイプ設定を保持する辞書
+        /// </summary>
+        private readonly Dictionary<string, int> _boothlmCategoryAssetTypes = new Dictionary<string, int>();
+
+        /// <summary>
         /// EditorPrefsに保存する際のキーのプレフィックス
         /// </summary>
         private const string PREFS_KEY_PREFIX = "UnityEditorAssetBrowser_CategoryAssetType_";
+        private const string PREFS_KEY_BOOTHLM_PREFIX = "UnityEditorAssetBrowser_BOOTHLMCategoryAssetType_";
 
         // EditorPrefsキー
         private const string PREFS_KEY_SHOW_FOLDER_THUMBNAIL = "UnityEditorAssetBrowser_ShowFolderThumbnail";
@@ -98,13 +107,16 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         /// <param name="onAEDatabasePathChanged">AEデータベースのパスが変更された時のコールバック</param>
         /// <param name="onKADatabasePathChanged">KAデータベースのパスが変更された時のコールバック</param>
+        /// <param name="onBOOTHLMDataPathChanged">BOOTHLMデータパスが変更された時のコールバック</param>
         public SettingsView(
             Action<string> onAEDatabasePathChanged,
-            Action<string> onKADatabasePathChanged
+            Action<string> onKADatabasePathChanged,
+            Action<string> onBOOTHLMDataPathChanged
         )
         {
             _onAEDatabasePathChanged = onAEDatabasePathChanged;
             _onKADatabasePathChanged = onKADatabasePathChanged;
+            _onBOOTHLMDataPathChanged = onBOOTHLMDataPathChanged;
             
             ExcludeFolderService.InitializeDefaultExcludeFolders();
             InitializeCategoryAssetTypes();
@@ -119,12 +131,13 @@ namespace UnityEditorAssetBrowser.Views
         {
             var aePath = DatabaseService.GetAEDatabasePath();
             var kaPath = DatabaseService.GetKADatabasePath();
+            var boothlmPath = DatabaseService.GetBOOTHLMDataPath();
 
             // データベース設定の表示状態を初期化
-            _showDatabaseSettings = string.IsNullOrEmpty(aePath) && string.IsNullOrEmpty(kaPath);
+            _showDatabaseSettings = string.IsNullOrEmpty(aePath) && string.IsNullOrEmpty(kaPath) && string.IsNullOrEmpty(boothlmPath);
 
             // カテゴリ設定の表示状態を初期化
-            _showCategorySettings = !string.IsNullOrEmpty(aePath);
+            _showCategorySettings = !string.IsNullOrEmpty(aePath) || !string.IsNullOrEmpty(boothlmPath);
         }
 
         /// <summary>
@@ -158,6 +171,43 @@ namespace UnityEditorAssetBrowser.Views
                     _categoryAssetTypes[category] = value;
                 }
             }
+
+            // BOOTHLMのカテゴリ初期化
+            var boothlmDatabase = DatabaseService.GetBOOTHLMDatabase();
+            if (boothlmDatabase != null)
+            {
+                var categories = boothlmDatabase.Items
+                    .Select(item => item.CategoryName)
+                    .Distinct()
+                    .OrderBy(c => c);
+
+                foreach (var category in categories)
+                {
+                    var key = PREFS_KEY_BOOTHLM_PREFIX + category;
+                    if (EditorPrefs.HasKey(key))
+                    {
+                        _boothlmCategoryAssetTypes[category] = EditorPrefs.GetInt(key);
+                    }
+                    else
+                    {
+                        _boothlmCategoryAssetTypes[category] = GetDefaultBOOTHLMAssetType(category);
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// BOOTHLMカテゴリのデフォルトアセットタイプを取得
+        /// </summary>
+        private int GetDefaultBOOTHLMAssetType(string category)
+        {
+            if (category.Contains("3D Characters") || category.Contains("3Dキャラクター") || category.Contains("Avatar") || category.Contains("アバター"))
+                return (int)AssetTypeConstants.Avatar;
+            if (category.Contains("3D Costumes") || category.Contains("3D衣装") || category.Contains("3D Accessories") || category.Contains("3D装飾品") || category.Contains("Fashion") || category.Contains("ファッション"))
+                return (int)AssetTypeConstants.AvatarRelated;
+            if (category.Contains("3D Environments") || category.Contains("3D環境") || category.Contains("World") || category.Contains("ワールド"))
+                return (int)AssetTypeConstants.World;
+            return (int)AssetTypeConstants.Other;
         }
 
         /// <summary>
@@ -168,6 +218,15 @@ namespace UnityEditorAssetBrowser.Views
         private void SaveCategoryAssetType(string category, int value)
         {
             var key = PREFS_KEY_PREFIX + category;
+            EditorPrefs.SetInt(key, value);
+        }
+
+        /// <summary>
+        /// BOOTHLMカテゴリのアセットタイプ設定をEditorPrefsに保存
+        /// </summary>
+        private void SaveBOOTHLMCategoryAssetType(string category, int value)
+        {
+            var key = PREFS_KEY_BOOTHLM_PREFIX + category;
             EditorPrefs.SetInt(key, value);
         }
 
@@ -253,6 +312,12 @@ namespace UnityEditorAssetBrowser.Views
                     "KA Database Path:",
                     DatabaseService.GetKADatabasePath(),
                     _onKADatabasePathChanged
+                );
+
+                DrawDatabasePathField(
+                    "BOOTHLM Data Path:",
+                    DatabaseService.GetBOOTHLMDataPath(),
+                    _onBOOTHLMDataPathChanged
                 );
 
                 EditorGUILayout.EndVertical();
@@ -346,7 +411,9 @@ namespace UnityEditorAssetBrowser.Views
             if (_showCategorySettings)
             {
                 var aeDatabase = DatabaseService.GetAEDatabase();
-                if (aeDatabase == null)
+                var boothlmDatabase = DatabaseService.GetBOOTHLMDatabase();
+
+                if (aeDatabase == null && boothlmDatabase == null)
                 {
                     EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                     EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("ae_settings_info"), MessageType.Info);
@@ -359,15 +426,60 @@ namespace UnityEditorAssetBrowser.Views
                     );
                     EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
-                    // 指定された順序のカテゴリを表示
-                    foreach (var category in _orderedCategories)
+                    if (aeDatabase != null)
                     {
-                        var items = aeDatabase.Items
-                            .Where(item => item.GetAECategoryName() == category)
-                            .ToList();
-                        
-                        if (items.Any())
+                        // 指定された順序のカテゴリを表示
+                        foreach (var category in _orderedCategories)
                         {
+                            var items = aeDatabase.Items
+                                .Where(item => item.GetAECategoryName() == category)
+                                .ToList();
+                            
+                            if (items.Any())
+                            {
+                                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
+                                EditorGUILayout.BeginHorizontal();
+                                EditorGUILayout.LabelField(
+                                    category,
+                                    GUIStyleManager.BoldLabel,
+                                    GUILayout.Width(200)
+                                );
+                                EditorGUILayout.LabelField(string.Format(LocalizationService.Instance.GetString("items_count"), items.Count), GUIStyleManager.Label);
+                                EditorGUILayout.EndHorizontal();
+
+                                // アセットタイプの選択
+                                EditorGUILayout.BeginHorizontal();
+                                EditorGUILayout.LabelField(LocalizationService.Instance.GetString("asset_type"), GUIStyleManager.Label, GUILayout.Width(100));
+                                var newValue = EditorGUILayout.Popup(
+                                    _categoryAssetTypes[category],
+                                    _assetTypes,
+                                    GUIStyleManager.Popup,
+                                    GUILayout.Width(200)
+                                );
+                                if (newValue != _categoryAssetTypes[category])
+                                {
+                                    _categoryAssetTypes[category] = newValue;
+                                    SaveCategoryAssetType(category, newValue);
+                                    OnSettingsChanged?.Invoke();
+                                }
+                                EditorGUILayout.EndHorizontal();
+                                EditorGUILayout.EndVertical();
+                            }
+                        }
+
+                        // その他のカテゴリを表示
+                        var otherCategories = aeDatabase.Items
+                            .Select(item => item.GetAECategoryName())
+                            .Distinct()
+                            .Where(category => !_orderedCategories.Contains(category))
+                            .OrderBy(category => category);
+
+                        foreach (var category in otherCategories)
+                        {
+                            var items = aeDatabase.Items
+                                .Where(item => item.GetAECategoryName() == category)
+                                .ToList();
+                            
                             EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
                             EditorGUILayout.BeginHorizontal();
                             EditorGUILayout.LabelField(
@@ -381,64 +493,78 @@ namespace UnityEditorAssetBrowser.Views
                             // アセットタイプの選択
                             EditorGUILayout.BeginHorizontal();
                             EditorGUILayout.LabelField(LocalizationService.Instance.GetString("asset_type"), GUIStyleManager.Label, GUILayout.Width(100));
+
                             var newValue = EditorGUILayout.Popup(
                                 _categoryAssetTypes[category],
                                 _assetTypes,
                                 GUIStyleManager.Popup,
                                 GUILayout.Width(200)
                             );
+
                             if (newValue != _categoryAssetTypes[category])
                             {
                                 _categoryAssetTypes[category] = newValue;
                                 SaveCategoryAssetType(category, newValue);
+                                OnSettingsChanged?.Invoke();
                             }
+
                             EditorGUILayout.EndHorizontal();
                             EditorGUILayout.EndVertical();
                         }
                     }
 
-                    // その他のカテゴリを表示
-                    var otherCategories = aeDatabase.Items
-                        .Select(item => item.GetAECategoryName())
-                        .Distinct()
-                        .Where(category => !_orderedCategories.Contains(category))
-                        .OrderBy(category => category);
-
-                    foreach (var category in otherCategories)
+                    if (boothlmDatabase != null)
                     {
-                        var items = aeDatabase.Items
-                            .Where(item => item.GetAECategoryName() == category)
-                            .ToList();
-                        
-                        EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField(
-                            category,
-                            GUIStyleManager.BoldLabel,
-                            GUILayout.Width(200)
-                        );
-                        EditorGUILayout.LabelField(string.Format(LocalizationService.Instance.GetString("items_count"), items.Count), GUIStyleManager.Label);
-                        EditorGUILayout.EndHorizontal();
-
-                        // アセットタイプの選択
-                        EditorGUILayout.BeginHorizontal();
-                        EditorGUILayout.LabelField(LocalizationService.Instance.GetString("asset_type"), GUIStyleManager.Label, GUILayout.Width(100));
-
-                        var newValue = EditorGUILayout.Popup(
-                            _categoryAssetTypes[category],
-                            _assetTypes,
-                            GUIStyleManager.Popup,
-                            GUILayout.Width(200)
+                        EditorGUILayout.Space(10);
+                        _showBOOTHLMCategories = EditorGUILayout.Foldout(
+                            _showBOOTHLMCategories,
+                            "BOOTHLM Categories",
+                            true,
+                            GUIStyleManager.Foldout
                         );
 
-                        if (newValue != _categoryAssetTypes[category])
+                        if (_showBOOTHLMCategories)
                         {
-                            _categoryAssetTypes[category] = newValue;
-                            SaveCategoryAssetType(category, newValue);
-                        }
+                            var categories = boothlmDatabase.Items
+                                .Select(item => item.CategoryName)
+                                .Distinct()
+                                .OrderBy(c => c);
 
-                        EditorGUILayout.EndHorizontal();
-                        EditorGUILayout.EndVertical();
+                            foreach (var category in categories)
+                            {
+                                if (!_boothlmCategoryAssetTypes.ContainsKey(category))
+                                {
+                                    _boothlmCategoryAssetTypes[category] = GetDefaultBOOTHLMAssetType(category);
+                                }
+
+                                EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
+                                EditorGUILayout.BeginHorizontal();
+                                EditorGUILayout.LabelField(category, GUIStyleManager.BoldLabel, GUILayout.Width(200));
+                                
+                                var items = boothlmDatabase.Items.Where(i => i.CategoryName == category).ToList();
+                                EditorGUILayout.LabelField(string.Format(LocalizationService.Instance.GetString("items_count"), items.Count), GUIStyleManager.Label);
+                                EditorGUILayout.EndHorizontal();
+
+                                EditorGUILayout.BeginHorizontal();
+                                EditorGUILayout.LabelField(LocalizationService.Instance.GetString("asset_type"), GUIStyleManager.Label, GUILayout.Width(100));
+                                
+                                int newValue = EditorGUILayout.Popup(
+                                    _boothlmCategoryAssetTypes[category],
+                                    _assetTypes,
+                                    GUIStyleManager.Popup,
+                                    GUILayout.Width(200)
+                                );
+
+                                if (newValue != _boothlmCategoryAssetTypes[category])
+                                {
+                                    _boothlmCategoryAssetTypes[category] = newValue;
+                                    SaveBOOTHLMCategoryAssetType(category, newValue);
+                                    OnSettingsChanged?.Invoke();
+                                }
+                                EditorGUILayout.EndHorizontal();
+                                EditorGUILayout.EndVertical();
+                            }
+                        }
                     }
 
                     EditorGUILayout.EndVertical(); // helpBox
@@ -703,7 +829,7 @@ namespace UnityEditorAssetBrowser.Views
             if (!string.IsNullOrEmpty(path) && GUILayout.Button(LocalizationService.Instance.GetString("remove"), GUIStyleManager.Button, GUILayout.Width(60)))
             {
                 onPathChanged("");
-                if (label == "AE Database Path:") InitializeCategoryAssetTypes();
+                if (label == "AE Database Path:" || label == "BOOTHLM Data Path:") InitializeCategoryAssetTypes();
             }
 
             // 参照ボタン
@@ -718,7 +844,7 @@ namespace UnityEditorAssetBrowser.Views
                 if (!string.IsNullOrEmpty(selectedPath))
                 {
                     onPathChanged(selectedPath);
-                    if (label == "AE Database Path:") InitializeCategoryAssetTypes();
+                    if (label == "AE Database Path:" || label == "BOOTHLM Data Path:") InitializeCategoryAssetTypes();
                 }
             }
 

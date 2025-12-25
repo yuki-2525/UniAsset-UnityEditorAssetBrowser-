@@ -118,6 +118,7 @@ namespace UnityEditorAssetBrowser
                 DatabaseService.GetKAWearablesDatabase(),
                 DatabaseService.GetKAWorldObjectsDatabase(),
                 DatabaseService.GetKAOtherAssetsDatabase(),
+                DatabaseService.GetBOOTHLMDatabase(),
                 _paginationInfo,
                 _searchViewModel
             );
@@ -188,6 +189,7 @@ namespace UnityEditorAssetBrowser
             // データベースを再読み込み
             DatabaseService.LoadAEDatabase();
             DatabaseService.LoadKADatabase();
+            DatabaseService.LoadBOOTHLMDatabase();
             _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
 
             // 現在表示中のアイテムの画像を再読み込み
