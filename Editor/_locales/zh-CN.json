@@ -66,6 +66,8 @@
   "sort_author_desc": "店铺名称（Z-A）",
   "sort_booth_id_desc": "Booth ID（从新到旧）",
   "sort_booth_id_asc": "Booth ID（从旧到新）",
+  "sort_updated_desc": "更新顺序（从新到旧）",
+  "sort_updated_asc": "更新顺序（从旧到新）",
   "about_window_title": "关于本软件",
   "developer": "开发者",
   "repository": "仓库",

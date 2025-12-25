@@ -66,6 +66,8 @@
   "sort_author_desc": "샵 이름 (Z-A순)",
   "sort_booth_id_desc": "Booth ID순 (최신순)",
   "sort_booth_id_asc": "Booth ID순 (오래된순)",
+  "sort_updated_desc": "업데이트 순 (최신순)",
+  "sort_updated_asc": "업데이트 순 (오래된순)",
   "about_window_title": "이 소프트웨어에 대하여",
   "developer": "개발자",
   "repository": "리포지토리",

@@ -172,6 +172,11 @@ namespace UnityEditorAssetBrowser.Models
         public DateTime CreatedDate { get; set; } = DateTime.MinValue;
 
         /// <summary>
+        /// 更新日時
+        /// </summary>
+        public DateTime UpdatedDate { get; set; } = DateTime.MinValue;
+
+        /// <summary>
         /// アイテムのタグ
         /// </summary>
         public string[] Tags { get; set; } = Array.Empty<string>();
@@ -203,6 +208,8 @@ namespace UnityEditorAssetBrowser.Models
             => Tags;
         public DateTime GetCreatedDate()
             => TimeZoneInfo.ConvertTimeToUtc(CreatedDate, TimeZoneInfo.Local);
+        public DateTime GetUpdatedDate()
+            => TimeZoneInfo.ConvertTimeToUtc(UpdatedDate, TimeZoneInfo.Local);
 
         /// <summary>
         /// AEアイテムのカテゴリー名を取得

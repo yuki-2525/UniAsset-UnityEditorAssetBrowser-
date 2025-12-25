@@ -35,6 +35,7 @@ namespace UnityEditorAssetBrowser.Models
         public string? ThumbnailUrl { get; set; }
         public string? Description { get; set; }
         public string CategoryName { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
         public bool IsAdult { get; set; }
         public List<string> Tags { get; set; } = new List<string>();
@@ -62,6 +63,7 @@ namespace UnityEditorAssetBrowser.Models
         public int GetBoothId() => Id;
         public string GetCategory() => CategoryName;
         public string[] GetTags() => Tags.ToArray();
-        public DateTime GetCreatedDate() => UpdatedAt;
+        public DateTime GetCreatedDate() => CreatedAt;
+        public DateTime GetUpdatedDate() => UpdatedAt;
     }
 }

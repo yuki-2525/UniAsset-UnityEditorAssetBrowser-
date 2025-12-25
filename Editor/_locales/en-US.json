@@ -66,6 +66,8 @@
   "sort_author_desc": "Shop Name (Z-A)",
   "sort_booth_id_desc": "Booth ID (Newest)",
   "sort_booth_id_asc": "Booth ID (Oldest)",
+  "sort_updated_desc": "Date Updated (Newest)",
+  "sort_updated_asc": "Date Updated (Oldest)",
   "about_window_title": "About This Software",
   "developer": "Developer",
   "repository": "Repository",

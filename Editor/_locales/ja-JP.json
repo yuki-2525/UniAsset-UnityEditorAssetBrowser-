@@ -66,6 +66,8 @@
   "sort_author_desc": "ショップ名（Z-A順）",
   "sort_booth_id_desc": "Booth Id順（新しい順）",
   "sort_booth_id_asc": "Booth Id順（古い順）",
+  "sort_updated_desc": "更新日順（新しい順）",
+  "sort_updated_asc": "更新日順（古い順）",
   "about_window_title": "このソフトについて",
   "developer": "開発者",
   "repository": "リポジトリ",

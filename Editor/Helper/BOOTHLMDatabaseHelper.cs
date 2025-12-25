@@ -27,6 +27,7 @@ namespace UnityEditorAssetBrowser.Helper
             public string? thumbnail_url { get; set; }
             public string? description { get; set; }
             public string? category_name { get; set; }
+            public string? created_at { get; set; }
             public string? updated_at { get; set; }
             public bool adult { get; set; }
         }
@@ -66,7 +67,8 @@ namespace UnityEditorAssetBrowser.Helper
                             b.thumbnail_url, 
                             b.description, 
                             c.name as category_name,
-                            b.updated_at,
+                            r.created_at,
+                            r.updated_at,
                             b.adult
                         FROM booth_items b
                         INNER JOIN registered_items r ON b.id = r.booth_item_id
@@ -86,6 +88,7 @@ namespace UnityEditorAssetBrowser.Helper
                             ThumbnailUrl = result.thumbnail_url,
                             Description = result.description,
                             CategoryName = result.category_name ?? "不明",
+                            CreatedAt = ParseDateTime(result.created_at),
                             UpdatedAt = ParseDateTime(result.updated_at),
                             IsAdult = result.adult
                         };

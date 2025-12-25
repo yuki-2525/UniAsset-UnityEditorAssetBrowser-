@@ -91,6 +91,24 @@ namespace UnityEditorAssetBrowser.Views
             {
                 var menu = new GenericMenu();
                 menu.AddItem(
+                    new GUIContent(LocalizationService.Instance.GetString("sort_updated_desc")),
+                    _assetBrowserViewModel.CurrentSortMethod
+                        == AssetBrowserViewModel.SortMethod.UpdatedDateDesc,
+                    () =>
+                        _assetBrowserViewModel.SetSortMethod(
+                            AssetBrowserViewModel.SortMethod.UpdatedDateDesc
+                        )
+                );
+                menu.AddItem(
+                    new GUIContent(LocalizationService.Instance.GetString("sort_updated_asc")),
+                    _assetBrowserViewModel.CurrentSortMethod
+                        == AssetBrowserViewModel.SortMethod.UpdatedDateAsc,
+                    () =>
+                        _assetBrowserViewModel.SetSortMethod(
+                            AssetBrowserViewModel.SortMethod.UpdatedDateAsc
+                        )
+                );
+                menu.AddItem(
                     new GUIContent(LocalizationService.Instance.GetString("sort_created_desc")),
                     _assetBrowserViewModel.CurrentSortMethod
                         == AssetBrowserViewModel.SortMethod.CreatedDateDesc,

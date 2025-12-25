@@ -141,6 +141,8 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
 
     /// <summary>
@@ -183,6 +185,8 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
 
     /// <summary>
@@ -231,6 +235,8 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
 
     /// <summary>
@@ -279,6 +285,8 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
     #endregion
 

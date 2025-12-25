@@ -63,7 +63,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             _boothlmDatabase = boothlmDatabase;
             _paginationInfo = paginationInfo;
             _searchViewModel = searchViewModel;
-            _currentSortMethod = SortMethod.CreatedDateDesc; // デフォルト値を設定
+            _currentSortMethod = SortMethod.UpdatedDateDesc; // デフォルト値を設定
         }
 
         /// <summary>
@@ -76,6 +76,12 @@ namespace UnityEditorAssetBrowser.ViewModels
 
         public enum SortMethod
         {
+            /// <summary>更新日順（新しい順）</summary>
+            UpdatedDateDesc,
+
+            /// <summary>更新日順（古い順）</summary>
+            UpdatedDateAsc,
+
             /// <summary>追加順（新しい順）</summary>
             CreatedDateDesc,
 
@@ -318,6 +324,8 @@ namespace UnityEditorAssetBrowser.ViewModels
                 SortMethod.AuthorDesc => items.OrderByDescending(item => item.GetAuthor()).ToList(),
                 SortMethod.BoothIdDesc => items.OrderByDescending(item => item.GetBoothId()).ToList(),
                 SortMethod.BoothIdAsc => items.OrderBy(item => item.GetBoothId()).ToList(),
+                SortMethod.UpdatedDateDesc => items.OrderByDescending(item => item.GetUpdatedDate()).ToList(),
+                SortMethod.UpdatedDateAsc => items.OrderBy(item => item.GetUpdatedDate()).ToList(),
                 _ => items,
             };
         }
