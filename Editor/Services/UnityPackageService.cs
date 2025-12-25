@@ -282,23 +282,72 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         /// <param name="folders">フォルダパスのリスト</param>
         /// <param name="imagePath">サムネイル画像パス</param>
-        private static void SetFolderThumbnails(List<string> folders, string imagePath)
+        /// <param name="direct">指定されたフォルダに直接設定するかどうか</param>
+        public static async void SetFolderThumbnails(List<string> folders, string imagePath, bool direct = false)
         {
             if (!ValidateInputParameters(folders, imagePath))
                 return;
 
-            string fullImagePath = GetValidatedImagePath(imagePath);
+            string fullImagePath = imagePath;
+            string? tempImagePath = null;
+
+            // URLの場合はダウンロードして一時ファイルを作成
+            if (IsUrl(imagePath))
+            {
+                try
+                {
+                    fullImagePath = await DownloadAndResizeImageAsync(imagePath);
+                    tempImagePath = fullImagePath;
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
+                    return;
+                }
+            }
+            else
+            {
+                fullImagePath = GetValidatedImagePath(imagePath);
+            }
+
             if (string.IsNullOrEmpty(fullImagePath))
                 return;
 
-            var targetFolders = DetermineTargetFolders(folders);
-            if (!targetFolders.Any())
+            try
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_target_folder_not_found"));
-                return;
-            }
+                HashSet<string> targetFolders;
+                if (direct)
+                {
+                    targetFolders = new HashSet<string>(folders);
+                }
+                else
+                {
+                    targetFolders = DetermineTargetFolders(folders);
+                }
 
-            CopyThumbnailsToTargetFolders(targetFolders, fullImagePath);
+                if (!targetFolders.Any())
+                {
+                    Debug.LogWarning(LocalizationService.Instance.GetString("warning_target_folder_not_found"));
+                    return;
+                }
+
+                CopyThumbnailsToTargetFolders(targetFolders, fullImagePath);
+            }
+            finally
+            {
+                // 一時ファイルの削除
+                if (!string.IsNullOrEmpty(tempImagePath) && File.Exists(tempImagePath))
+                {
+                    try
+                    {
+                        File.Delete(tempImagePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -492,6 +541,11 @@ namespace UnityEditorAssetBrowser.Services
             }
         }
 
+        /// <summary>
+        /// 指定されたパスがルートフォルダまたはカテゴリルートフォルダかどうかを判定する
+        /// </summary>
+        /// <param name="path">判定するパス</param>
+        /// <returns>ルートまたはカテゴリルートの場合はtrue</returns>
         private static bool IsRootOrCategoryRoot(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
@@ -589,7 +643,11 @@ namespace UnityEditorAssetBrowser.Services
             return parts.Length == 2 && parts[0] == "Assets" && parts[1] == "FolderIcon.jpg";
         }
 
-        // 複数パスの最も深い共通の親ディレクトリを求める
+        /// <summary>
+        /// 複数のパスに共通する最も深い親ディレクトリを取得する
+        /// </summary>
+        /// <param name="paths">パスのリスト</param>
+        /// <returns>共通の親ディレクトリパス。共通部分がない場合は空文字列</returns>
         private static string GetDeepestCommonParent(IEnumerable<string> paths)
         {
             if (paths == null || !paths.Any()) return string.Empty;
@@ -614,11 +672,21 @@ namespace UnityEditorAssetBrowser.Services
             return common.Count > 0 ? string.Join("/", common) : string.Empty;
         }
 
+        /// <summary>
+        /// 指定されたパスがURLかどうかを判定する
+        /// </summary>
+        /// <param name="path">判定するパス</param>
+        /// <returns>http:// または https:// で始まる場合はtrue</returns>
         private static bool IsUrl(string path)
         {
             return !string.IsNullOrEmpty(path) && (path.StartsWith("http://") || path.StartsWith("https://"));
         }
 
+        /// <summary>
+        /// URLから画像をダウンロードし、適切なサイズにリサイズして一時ファイルとして保存する
+        /// </summary>
+        /// <param name="url">画像のURL</param>
+        /// <returns>保存された一時ファイルのパス</returns>
         private static async Task<string> DownloadAndResizeImageAsync(string url)
         {
             using (var uwr = UnityWebRequestTexture.GetTexture(url))
@@ -637,7 +705,7 @@ namespace UnityEditorAssetBrowser.Services
 
                 try
                 {
-                    // Resize if needed
+                    // 必要に応じてリサイズ（幅300px基準）
                     int targetWidth = 300;
                     int targetHeight = texture.height;
                     
@@ -666,6 +734,7 @@ namespace UnityEditorAssetBrowser.Services
                     string tempPath = Path.Combine(Application.temporaryCachePath, "temp_thumbnail_" + Guid.NewGuid() + ".jpg");
                     File.WriteAllBytes(tempPath, bytes);
                     
+                    // 生成したテクスチャを解放
                     if (Application.isPlaying)
                         UnityEngine.Object.Destroy(result);
                     else
@@ -675,6 +744,7 @@ namespace UnityEditorAssetBrowser.Services
                 }
                 finally
                 {
+                    // 元のテクスチャを解放
                     if (Application.isPlaying)
                         UnityEngine.Object.Destroy(texture);
                     else

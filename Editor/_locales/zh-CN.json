@@ -132,5 +132,6 @@
   "show_import_dialog": "导入时显示确认对话框",
   "dialog_info": "无论此设置如何，批量导入期间都不会显示对话框。",
   "open_import_list": "打开导入列表",
-  "import_list_help": "可以通过右键单击 UnityPackage 或将其拖放到此处来添加到列表中。"
+  "import_list_help": "可以通过右键单击 UnityPackage 或将其拖放到此处来添加到列表中。",
+  "set_folder_thumbnail": "给文件夹添加缩略图"
 }

@@ -98,7 +98,7 @@ namespace UnityEditorAssetBrowser.Views
             
             DrawItemBasicInfo(title, author);
             DrawItemMetadata(title, category, supportedAvatars, tags, memo);
-            DrawItemActionButtons(itemPath, boothItemId);
+            DrawItemActionButtons(itemPath, boothItemId, imagePath);
 
             GUILayout.EndVertical();
             
@@ -139,9 +139,10 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アクションボタン（エクスプローラー・Booth）を描画
         /// </summary>
-        private void DrawItemActionButtons(string itemPath, int boothItemId)
+        private void DrawItemActionButtons(string itemPath, int boothItemId, string imagePath)
         {
             EditorGUILayout.Space(5);
+            DrawSetFolderThumbnailButton(imagePath);
             DrawExplorerOpenButton(itemPath);
 
             if (boothItemId <= 0) return;
@@ -156,6 +157,32 @@ namespace UnityEditorAssetBrowser.Views
             if (GUILayout.Button(LocalizationService.Instance.GetString("open_product_page"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 Application.OpenURL($"https://booth.pm/ja/items/{boothItemId}");
+            }
+        }
+
+        /// <summary>
+        /// "フォルダにサムネイルを付与"ボタンを描画
+        /// </summary>
+        private void DrawSetFolderThumbnailButton(string imagePath)
+        {
+            if (GUILayout.Button(LocalizationService.Instance.GetString("set_folder_thumbnail"), GUIStyleManager.Button, GUILayout.Width(150)))
+            {
+                string folderPath = EditorUtility.OpenFolderPanel(
+                    LocalizationService.Instance.GetString("select_directory"),
+                    "Assets",
+                    ""
+                );
+
+                if (!string.IsNullOrEmpty(folderPath))
+                {
+                    // Assetsフォルダからの相対パスに変換
+                    if (folderPath.StartsWith(Application.dataPath))
+                    {
+                        folderPath = "Assets" + folderPath.Substring(Application.dataPath.Length);
+                    }
+                    
+                    UnityPackageServices.SetFolderThumbnails(new List<string> { folderPath }, imagePath, true);
+                }
             }
         }
 
