@@ -6,12 +6,22 @@
 
 using System;
 using System.IO;
+using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
 
 namespace UnityEditorAssetBrowser.Models
 {
+    /// <summary>
+    /// 統合されたKonoAssetデータベース
+    /// 全てのKonoAssetデータベースのアイテムをまとめて管理する
+    /// </summary>
+    public class UnifiedKonoAssetDatabase
+    {
+        public List<IDatabaseItem> Items { get; set; } = new List<IDatabaseItem>();
+    }
+
     // #region Base Database Models
     // /// <summary>
     // /// KonoAssetの基本データベースモデル

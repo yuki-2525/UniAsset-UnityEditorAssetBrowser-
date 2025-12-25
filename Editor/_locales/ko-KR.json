@@ -27,6 +27,7 @@
   "auto_search": "입력 시 자동 검색",
   "display_size_settings": "표시 크기 설정",
   "category_settings": "카테고리 설정",
+  "import_folder_name": "가져오기 폴더 이름: ",
   "folder_thumbnail_settings": "폴더 썸네일 설정",
   "import_settings": "임포트 설정",
   "exclude_folder_settings": "제외 폴더 설정",

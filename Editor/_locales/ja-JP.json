@@ -27,6 +27,7 @@
   "auto_search": "入力時に自動で検索する",
   "display_size_settings": "表示サイズ設定",
   "category_settings": "カテゴリ設定",
+  "import_folder_name": "インポート時のフォルダ名: ",
   "folder_thumbnail_settings": "フォルダサムネイル設定",
   "import_settings": "インポート設定",
   "exclude_folder_settings": "除外フォルダ設定",

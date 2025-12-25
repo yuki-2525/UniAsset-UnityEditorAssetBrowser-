@@ -148,23 +148,7 @@ namespace UnityEditorAssetBrowser.Services
                 }
             }
 
-            // データベースを更新
-            if (
-                _assetBrowserViewModel != null
-                && _searchViewModel != null
-                && _paginationViewModel != null
-            )
-            {
-                _assetBrowserViewModel.UpdateDatabases(
-                    GetAEDatabase(),
-                    GetKAAvatarsDatabase(),
-                    GetKAWearablesDatabase(),
-                    GetKAWorldObjectsDatabase(),
-                    GetKAOtherAssetsDatabase(),
-                    GetBOOTHLMDatabase()
-                );
-                _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
-            }
+            UpdateViewModels();
         }
 
         /// <summary>
@@ -196,23 +180,7 @@ namespace UnityEditorAssetBrowser.Services
                 _kaOtherAssetsDatabase = result.OtherAssetsDatabase;
             }
 
-            // データベースを更新
-            if (
-                _assetBrowserViewModel != null
-                && _searchViewModel != null
-                && _paginationViewModel != null
-            )
-            {
-                _assetBrowserViewModel.UpdateDatabases(
-                    GetAEDatabase(),
-                    GetKAAvatarsDatabase(),
-                    GetKAWearablesDatabase(),
-                    GetKAWorldObjectsDatabase(),
-                    GetKAOtherAssetsDatabase(),
-                    GetBOOTHLMDatabase()
-                );
-                _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
-            }
+            UpdateViewModels();
         }
 
         /// <summary>
@@ -233,7 +201,11 @@ namespace UnityEditorAssetBrowser.Services
                 _boothlmDatabase = BOOTHLMDatabaseHelper.LoadBOOTHLMDatabase(dbPath);
             }
             
-            // データベースを更新
+            UpdateViewModels();
+        }
+
+        private static void UpdateViewModels()
+        {
             if (
                 _assetBrowserViewModel != null
                 && _searchViewModel != null
@@ -417,6 +389,26 @@ namespace UnityEditorAssetBrowser.Services
         /// <returns>データベース（存在しない場合はnull）</returns>
         public static KonoAssetOtherAssetsDatabase? GetKAOtherAssetsDatabase()
             => _kaOtherAssetsDatabase;
+
+        /// <summary>
+        /// 全てのKonoAssetデータベースを統合して取得する
+        /// </summary>
+        /// <returns>統合データベース（全てのデータベースが存在しない場合はnull）</returns>
+        public static UnifiedKonoAssetDatabase? GetKADatabase()
+        {
+            if (_kaAvatarsDatabase == null && _kaWearablesDatabase == null && _kaWorldObjectsDatabase == null && _kaOtherAssetsDatabase == null)
+            {
+                return null;
+            }
+
+            var unified = new UnifiedKonoAssetDatabase();
+            if (_kaAvatarsDatabase != null) unified.Items.AddRange(_kaAvatarsDatabase.Data);
+            if (_kaWearablesDatabase != null) unified.Items.AddRange(_kaWearablesDatabase.Data);
+            if (_kaWorldObjectsDatabase != null) unified.Items.AddRange(_kaWorldObjectsDatabase.Data);
+            if (_kaOtherAssetsDatabase != null) unified.Items.AddRange(_kaOtherAssetsDatabase.Data);
+            
+            return unified;
+        }
 
         /// <summary>
         /// BOOTHLMデータベースを取得する

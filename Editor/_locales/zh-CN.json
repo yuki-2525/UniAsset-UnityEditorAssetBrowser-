@@ -27,6 +27,7 @@
   "auto_search": "输入时自动搜索",
   "display_size_settings": "显示大小设置",
   "category_settings": "分类设置",
+  "import_folder_name": "导入文件夹名称: ",
   "folder_thumbnail_settings": "文件夹缩略图设置",
   "import_settings": "导入设置",
   "exclude_folder_settings": "排除文件夹设置",

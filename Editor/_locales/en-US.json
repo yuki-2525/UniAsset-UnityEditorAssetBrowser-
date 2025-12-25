@@ -27,6 +27,7 @@
   "auto_search": "Search automatically on input",
   "display_size_settings": "Display Size Settings",
   "category_settings": "Category Settings",
+  "import_folder_name": "Import Folder Name: ",
   "folder_thumbnail_settings": "Folder Thumbnail Settings",
   "import_settings": "Import Settings",
   "exclude_folder_settings": "Exclude Folder Settings",

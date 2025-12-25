@@ -320,6 +320,7 @@ namespace UnityEditorAssetBrowser.Views
                 // データベースを更新
                 DatabaseService.LoadAEDatabase();
                 DatabaseService.LoadKADatabase();
+                DatabaseService.LoadBOOTHLMDatabase();
                 _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
                 _assetItemView.ResetUnitypackageCache();
                 HandleUtility.Repaint();

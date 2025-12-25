@@ -22,6 +22,7 @@ namespace UnityEditorAssetBrowser.Services
         private const string PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER = "UnityEditorAssetBrowser_ImportToCategoryFolder";
         private const string PREFS_KEY_GENERATE_FOLDER_THUMBNAIL = "UnityEditorAssetBrowser_GenerateFolderThumbnail";
         private const string PREFS_KEY_SHOW_IMPORT_DIALOG = "UnityEditorAssetBrowser_ShowImportDialog";
+        private const string PREFS_KEY_CATEGORY_FOLDER_NAME_PREFIX = "UnityEditorAssetBrowser_CategoryFolderName_";
 
         /// <summary>
         /// 指定されたディレクトリ内のUnityPackageファイルを検索する
@@ -109,8 +110,12 @@ namespace UnityEditorAssetBrowser.Services
                         // クリーンアップ（前回のゴミがあれば）
                         UnityPackageModifier.Cleanup();
 
+                        // カテゴリフォルダ名の取得（設定があればそれを使用、なければカテゴリ名をそのまま使用）
+                        string folderNameKey = PREFS_KEY_CATEGORY_FOLDER_NAME_PREFIX + category;
+                        string targetFolderName = EditorPrefs.GetString(folderNameKey, category);
+
                         EditorUtility.DisplayProgressBar("Preparing Package", "Modifying package structure...", 0.5f);
-                        pathToImport = await UnityPackageModifier.CreateModifiedPackageAsync(packagePath, category);
+                        pathToImport = await UnityPackageModifier.CreateModifiedPackageAsync(packagePath, targetFolderName);
                         isModified = true;
                     }
                     catch (Exception ex)
