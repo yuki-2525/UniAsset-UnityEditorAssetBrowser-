@@ -107,11 +107,11 @@ namespace UnityEditorAssetBrowser.Services
                 // 既に読み込み中の場合はプレースホルダーを返す
                 if (_loadingImages.Contains(path))
                 {
-                    DebugLogger.Log($"Cache miss (loading): {path}");
+                    // DebugLogger.Log($"Cache miss (loading): {path}");
                     return _placeholderTexture;
                 }
                 
-                DebugLogger.Log($"Cache miss (new load): {path}");
+                // DebugLogger.Log($"Cache miss (new load): {path}");
             }
 
             // URLの場合は非同期読み込みを開始してプレースホルダーを返す
@@ -124,12 +124,12 @@ namespace UnityEditorAssetBrowser.Services
             // 即座に同期読み込みを試行（小さいファイル用）
             if (TryLoadSmallImageSync(path, out var texture))
             {
-                DebugLogger.Log($"Loaded small image sync: {path}");
+                // DebugLogger.Log($"Loaded small image sync: {path}");
                 return texture;
             }
 
             // 大きいファイルは非同期読み込み
-            DebugLogger.Log($"Start loading large/async: {path}");
+            // DebugLogger.Log($"Start loading large/async: {path}");
             LoadTextureAsync(path, priority: 1);
             return _placeholderTexture;
         }
@@ -203,7 +203,7 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         private void LoadLargeImageAsync(string path, Action<Texture2D?>? onComplete)
         {
-            DebugLogger.Log($"Async load started (Task): {path}");
+            // DebugLogger.Log($"Async load started (Task): {path}");
             try
             {
                 if (!File.Exists(path))
@@ -326,7 +326,7 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         private void LoadUrlImage(string url, Action<Texture2D?>? onComplete)
         {
-            DebugLogger.Log($"Async load started (URL): {url}");
+            // DebugLogger.Log($"Async load started (URL): {url}");
             lock (_queueLock)
             {
                 _mainThreadQueue.Enqueue(async () =>
@@ -513,7 +513,7 @@ namespace UnityEditorAssetBrowser.Services
                 
                 _nodeMap[path] = node;
                 _currentCacheMemoryUsage += textureSize;
-                DebugLogger.Log($"Added to cache: {path} (Size: {textureSize / 1024} KB, Total: {_currentCacheMemoryUsage / 1024 / 1024} MB)");
+                // DebugLogger.Log($"Added to cache: {path} (Size: {textureSize / 1024} KB, Total: {_currentCacheMemoryUsage / 1024 / 1024} MB)");
             }
         }
 
@@ -548,7 +548,7 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (ImageCache.TryGetValue(path, out var texture))
             {
-                DebugLogger.Log($"Removing from cache: {path}");
+                // DebugLogger.Log($"Removing from cache: {path}");
                 if (texture != null)
                 {
                     long textureSize = Profiler.GetRuntimeMemorySizeLong(texture);
