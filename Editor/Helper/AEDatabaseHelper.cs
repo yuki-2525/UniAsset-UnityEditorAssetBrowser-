@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from AETools(https://github.com/puk06/AE-Tools)
 // AETools is licensed under the MIT License. https://github.com/puk06/AE-Tools/blob/master/LICENSE.txt
 
@@ -27,6 +27,7 @@ namespace UnityEditorAssetBrowser.Helper
         /// <returns>読み込んだデータベース。読み込みに失敗した場合はnull</returns>
         public static AvatarExplorerDatabase? LoadAEDatabaseFile(string path)
         {
+            DebugLogger.Log($"Starting to load AE database from: {path}");
             try
             {
                 // パスがディレクトリの場合は、ItemsData.jsonを探す
@@ -44,7 +45,7 @@ namespace UnityEditorAssetBrowser.Helper
                         }
                         else
                         {
-                            Debug.LogWarning($"AE database file not found");
+                            DebugLogger.LogWarning($"AE database file not found in directory: {path}");
                             return null;
                         }
                     }
@@ -55,11 +56,12 @@ namespace UnityEditorAssetBrowser.Helper
                     jsonPath = path;
                     if (!File.Exists(jsonPath))
                     {
-                        Debug.LogWarning($"AE database file not found at: {jsonPath}");
+                        DebugLogger.LogWarning($"AE database file not found at: {jsonPath}");
                         return null;
                     }
                 }
 
+                DebugLogger.Log($"Reading json file: {jsonPath}");
                 var json = File.ReadAllText(jsonPath);
 
                 // JSONシリアライザーの設定
@@ -71,6 +73,7 @@ namespace UnityEditorAssetBrowser.Helper
                 var items = JsonConvert.DeserializeObject<AvatarExplorerItem[]>(json, settings);
                 if (items != null)
                 {
+                    DebugLogger.Log($"Loaded {items.Length} items from AE database.");
                     foreach (var item in items)
                     {
                         item.SupportedAvatar = ConvertSupportedAvatarPaths(items, item.SupportedAvatar);
@@ -79,11 +82,12 @@ namespace UnityEditorAssetBrowser.Helper
                     return new AvatarExplorerDatabase(items);
                 }
 
+                DebugLogger.LogWarning("Deserialized items structure is null.");
                 return null;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to load AE database: {ex.Message}");
+                DebugLogger.LogError($"Failed to load AE database: {ex.Message}");
                 return null;
             }
         }

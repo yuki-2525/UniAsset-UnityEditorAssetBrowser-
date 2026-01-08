@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Models;
 using UnityEditorAssetBrowser.Services;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.ViewModels
 {
@@ -45,6 +46,7 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <param name="tab">切り替え先のタブインデックス</param>
         public void SetCurrentTab(int tab)
         {
+            DebugLogger.Log($"SearchViewModel Tab Changed: {_currentTab} -> {tab}");
             // データベースがnullの場合は、検索条件の更新をスキップ
             if (_itemSearchService.IsDatabaseNull())
             {
@@ -68,7 +70,8 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// 現在のタブの検索条件をクリア
         /// </summary>
         public void ClearSearchCriteria()
-        {
+        {DebugLogger.Log("SearchViewModel: Clearing Search Criteria");
+            
             SearchCriteria = new SearchCriteria();
             _tabSearchCriteria[_currentTab] = SearchCriteria.Clone();
         }

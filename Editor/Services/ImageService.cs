@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from AssetLibraryManager (https://github.com/MAIOTAchannel/AssetLibraryManager)
 // Used with permission from MAIOTAchannel
 
@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditorAssetBrowser.Interfaces;
+using UnityEditorAssetBrowser.Helper;
 using UnityEngine;
 using UnityEngine.Networking;
 
@@ -91,6 +92,7 @@ namespace UnityEditorAssetBrowser.Services
             // URLの場合は非同期読み込みを開始してプレースホルダーを返す
             if (path.StartsWith("http://") || path.StartsWith("https://"))
             {
+                DebugLogger.Log($"Requested URL texture: {path}");
                 LoadTextureAsync(path, priority: 1);
                 return _placeholderTexture;
             }
@@ -98,10 +100,12 @@ namespace UnityEditorAssetBrowser.Services
             // 即座に同期読み込みを試行（小さいファイル用）
             if (TryLoadSmallImageSync(path, out var texture))
             {
+                DebugLogger.Log($"Loaded small image sync: {path}");
                 return texture;
             }
 
             // 大きいファイルは非同期読み込み
+            DebugLogger.Log($"Queueing async load for: {path}");
             LoadTextureAsync(path, priority: 1);
             return _placeholderTexture;
         }
@@ -188,7 +192,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_large_image_load_failed"), path, ex.Message));
+                DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_large_image_load_failed"), path, ex.Message));
 
                 _mainThreadQueue.Enqueue(() => {
                     _loadingImages.Remove(path);
@@ -219,7 +223,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_texture_creation_failed"), path, ex.Message));
+                DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_texture_creation_failed"), path, ex.Message));
                 if (texture != null)
                 {
                     UnityEngine.Object.DestroyImmediate(texture);
@@ -251,6 +255,8 @@ namespace UnityEditorAssetBrowser.Services
             // 既にキャッシュに存在する場合
             if (ImageCache.TryGetValue(path, out var cachedTexture))
             {
+                // Detailed debug log might be too spammy even for debug mode, but let's add it for "detailed" tracing if needed.
+                // DebugLogger.Log($"Cache hit for: {path}");
                 UpdateAccessOrder(path);
                 onComplete?.Invoke(cachedTexture);
                 return;
@@ -282,12 +288,13 @@ namespace UnityEditorAssetBrowser.Services
 
                     if (uwr.result != UnityWebRequest.Result.Success)
                     {
-                        // Debug.LogWarning($"Failed to download image: {url}\n{uwr.error}");
+                        DebugLogger.LogWarning($"Failed to download image: {url}\n{uwr.error}");
                         _loadingImages.Remove(url);
                         onComplete?.Invoke(null);
                     }
                     else
                     {
+                        DebugLogger.Log($"Image downloaded: {url}");
                         var texture = DownloadHandlerTexture.GetContent(uwr);
                         if (texture != null)
                         {
@@ -307,7 +314,8 @@ namespace UnityEditorAssetBrowser.Services
         /// メモリ使用量を削減するために使用する
         /// </summary>
         public void ClearCache()
-        {
+        {DebugLogger.Log($"Clearing image cache. Count: {ImageCache.Count}");
+            
             // 全テクスチャを適切に解放
             foreach (var texture in ImageCache.Values)
             {
@@ -319,7 +327,7 @@ namespace UnityEditorAssetBrowser.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogWarning($"テクスチャの破棄に失敗しました: {ex.Message}");
+                        DebugLogger.LogWarning($"テクスチャの破棄に失敗しました: {ex.Message}");
                     }
                 }
             }
@@ -349,7 +357,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"ImageService dispose中にエラーが発生しました: {ex.Message}");
+                DebugLogger.LogWarning($"ImageService dispose中にエラーが発生しました: {ex.Message}");
             }
             finally
             {

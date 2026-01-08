@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 using System;
 using System.Collections.Generic;
@@ -7,6 +7,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Services;
 using UnityEngine;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser
 {
@@ -54,6 +55,7 @@ namespace UnityEditorAssetBrowser
         {
             if (enabled && !_isRegistered)
             {
+                Helper.DebugLogger.Log("FolderIconDrawer enabled.");
                 // 有効化：イベント登録
                 EditorApplication.projectWindowItemOnGUI -= OnProjectWindowItemGUI;
                 EditorApplication.projectWindowItemOnGUI += OnProjectWindowItemGUI;
@@ -61,6 +63,7 @@ namespace UnityEditorAssetBrowser
             }
             else if (!enabled && _isRegistered)
             {
+                Helper.DebugLogger.Log("FolderIconDrawer disabled.");
                 // 無効化：イベント解除
                 EditorApplication.projectWindowItemOnGUI -= OnProjectWindowItemGUI;
                 _isRegistered = false;
@@ -334,6 +337,7 @@ namespace UnityEditorAssetBrowser
             // テクスチャキャッシュが上限を超えた場合、半分をクリア
             if (_textureCache.Count > MAX_CACHE_SIZE)
             {
+                Helper.DebugLogger.Log($"Cleaning up texture cache (Count: {_textureCache.Count})");
                 var keysToRemove = _textureCache.Keys.Take(_textureCache.Count / 2).ToList();
                 foreach (var key in keysToRemove)
                 {
@@ -344,6 +348,7 @@ namespace UnityEditorAssetBrowser
             // フォルダキャッシュも同様にクリーンアップ
             if (_folderCache.Count > MAX_CACHE_SIZE)
             {
+                Helper.DebugLogger.Log($"Cleaning up folder cache (Count: {_folderCache.Count})");
                 var keysToRemove = _folderCache.Keys.Take(_folderCache.Count / 2).ToList();
                 foreach (var key in keysToRemove)
                 {
@@ -354,6 +359,7 @@ namespace UnityEditorAssetBrowser
             // ディレクトリキャッシュも同様にクリーンアップ
             if (_directoryCache.Count > MAX_CACHE_SIZE)
             {
+                Helper.DebugLogger.Log($"Cleaning up directory cache (Count: {_directoryCache.Count})");
                 var keysToRemove = _directoryCache.Keys.Take(_directoryCache.Count / 2).ToList();
                 foreach (var key in keysToRemove)
                 {

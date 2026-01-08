@@ -25,6 +25,7 @@ namespace UnityEditorAssetBrowser.Windows
 
         public static void ShowWindow()
         {
+            DebugLogger.Log("Opening AboutWindow.");
             var w = GetWindow<AboutWindow>(true, LocalizationService.Instance.GetString("about_window_title"), true);
             w.minSize = new Vector2(400, 220);
             w.Show();
@@ -71,6 +72,7 @@ namespace UnityEditorAssetBrowser.Windows
             EditorGUILayout.LabelField(LocalizationService.Instance.GetString("github_repo_label"), GUIStyleManager.BoldLabel);
             if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_github"), "GitHub リポジトリをブラウザで開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening GitHub Repo.");
                 Application.OpenURL(RepoUrl);
             }
             EditorGUILayout.EndHorizontal();
@@ -80,6 +82,7 @@ namespace UnityEditorAssetBrowser.Windows
             EditorGUILayout.LabelField(LocalizationService.Instance.GetString("discord_server_label"), GUIStyleManager.BoldLabel);
             if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_discord"), "サポート用 Discord サーバーに移動します"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening Discord Server.");
                 Application.OpenURL(DiscordUrl);
             }
             EditorGUILayout.EndHorizontal();
@@ -89,6 +92,7 @@ namespace UnityEditorAssetBrowser.Windows
             EditorGUILayout.LabelField(LocalizationService.Instance.GetString("developer_x_label"), GUIStyleManager.BoldLabel);
             if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_x"), "開発者の X (旧Twitter) ページを開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening Developer X page.");
                 Application.OpenURL(DeveloperXUrl);
             }
             EditorGUILayout.EndHorizontal();
@@ -98,6 +102,7 @@ namespace UnityEditorAssetBrowser.Windows
             EditorGUILayout.LabelField(LocalizationService.Instance.GetString("support_request_label"), GUIStyleManager.BoldLabel);
             if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_support_page"), "支援ページ (Fanbox) をブラウザで開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening Fanbox page.");
                 Application.OpenURL(FanboxUrl);
             }
             EditorGUILayout.EndHorizontal();

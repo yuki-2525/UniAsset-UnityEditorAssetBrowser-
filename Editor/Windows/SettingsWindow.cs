@@ -1,8 +1,9 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Services;
+using UnityEditorAssetBrowser.Helper; // Added
 using UnityEditorAssetBrowser.ViewModels;
 using UnityEditorAssetBrowser.Views;
 using UnityEngine;
@@ -22,6 +23,7 @@ namespace UnityEditorAssetBrowser.Windows
             PaginationViewModel paginationViewModel
         )
         {
+            DebugLogger.Log("Opening SettingsWindow.");
             var window = GetWindow<SettingsWindow>(LocalizationService.Instance.GetString("settings_window_title"));
             window.minSize = new Vector2(400, 200);
             window._assetBrowserViewModel = assetBrowserViewModel;
@@ -68,7 +70,7 @@ namespace UnityEditorAssetBrowser.Windows
             {
                 bool newState = !isDebug;
                 EditorPrefs.SetBool(debugKey, newState);
-                Debug.Log($"[UniAsset] Debug Mode: {(newState ? "ON" : "OFF")}");
+                Debug.Log($"[UniAsset][Debug] Debug Mode toggled: {(newState ? "ON" : "OFF")}");
             });
         }
     }

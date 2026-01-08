@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from Avatar-Explorer(https://github.com/puk06/Avatar-Explorer)
 // Avatar-Explorer is licensed under the MIT License. https://github.com/puk06/Avatar-Explorer/blob/main/LICENSE)
 // This code is borrowed from AssetLibraryManager (https://github.com/MAIOTAchannel/AssetLibraryManager)
@@ -14,6 +14,7 @@ using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Models;
 using UnityEditorAssetBrowser.Services;
 using UnityEngine;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.ViewModels
 {
@@ -71,6 +72,7 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// </summary>
         public void Initialize()
         {
+            DebugLogger.Log("Initializing AssetBrowserViewModel");
             LoadSortMethod();
         }
 
@@ -338,6 +340,7 @@ namespace UnityEditorAssetBrowser.ViewModels
         {
             if (_currentSortMethod != method)
             {
+                DebugLogger.Log($"SortMethod changed: {_currentSortMethod} -> {method}");
                 _currentSortMethod = method;
                 SaveSortMethod();
                 SortMethodChanged?.Invoke();
@@ -403,6 +406,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             BOOTHLMDatabase? boothlmDatabase
         )
         {
+            DebugLogger.Log("UpdateDatabases called");
             // データベースがnullの場合は、即座に更新を完了
             if (
                 aeDatabase == null

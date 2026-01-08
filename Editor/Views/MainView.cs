@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -83,6 +83,8 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         public void DrawMainWindow()
         {
+            // DebugLogger.Log("DrawMainWindow"); // Too frequent, but good for tracing repaint performance issues. Keeping commented out.
+
             EditorGUILayout.BeginVertical();
             EditorGUILayout.Space(10);
 
@@ -120,6 +122,7 @@ namespace UnityEditorAssetBrowser.Views
             var newTab = GUILayout.SelectionGrid(_paginationViewModel.SelectedTab, tabs, tabs.Length, GUIStyleManager.TabButton);
             if (newTab != _paginationViewModel.SelectedTab)
             {
+                DebugLogger.Log($"Tab switched: {_paginationViewModel.SelectedTab} -> {newTab}");
                 _paginationViewModel.SelectedTab = newTab;
                 _paginationViewModel.ResetPage();
                 _searchViewModel.SetCurrentTab(newTab);

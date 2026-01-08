@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from AETools(https://github.com/puk06/AE-Tools)
 // AETools is licensed under the MIT License. https://github.com/puk06/AE-Tools/blob/master/LICENSE.txt
 
@@ -105,9 +105,14 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public static void LoadSettings()
         {
+            DebugLogger.Log("Loading database settings...");
             _aeDatabasePath = EditorPrefs.GetString(AE_DATABASE_PATH_KEY, "");
             _kaDatabasePath = EditorPrefs.GetString(KA_DATABASE_PATH_KEY, "");
             _boothlmDatabasePath = EditorPrefs.GetString(BOOTHLM_DATABASE_PATH_KEY, "");
+
+            DebugLogger.Log($"AE Path: {_aeDatabasePath}");
+            DebugLogger.Log($"KA Path: {_kaDatabasePath}");
+            DebugLogger.Log($"BOOTHLM Path: {_boothlmDatabasePath}");
 
             if (!string.IsNullOrEmpty(_aeDatabasePath)) LoadAEDatabase();
             if (!string.IsNullOrEmpty(_kaDatabasePath)) LoadKADatabase();
@@ -131,6 +136,8 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public static void LoadAEDatabase()
         {
+            DebugLogger.Log($"LoadAEDatabase path: {_aeDatabasePath}");
+
             // データベースをクリア
             ClearAEDatabase();
 
@@ -157,6 +164,8 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public static void LoadKADatabase()
         {
+            DebugLogger.Log($"LoadKADatabase path: {_kaDatabasePath}");
+
             // データベースをクリア
             ClearKADatabase();
 
@@ -195,6 +204,7 @@ namespace UnityEditorAssetBrowser.Services
             // data.dbのパスは固定
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string dbPath = Path.Combine(appDataPath, "pm.booth.library-manager", "data.db");
+            DebugLogger.Log($"LoadBOOTHLMDatabase path: {dbPath}");
 
             if (File.Exists(dbPath))
             {

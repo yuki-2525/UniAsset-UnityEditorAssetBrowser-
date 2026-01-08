@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 #nullable enable
 
 using System;
@@ -44,9 +44,11 @@ namespace UnityEditorAssetBrowser.Helper
         /// <returns>読み込んだデータベース。失敗時はnull</returns>
         public static BOOTHLMDatabase? LoadBOOTHLMDatabase(string dbPath)
         {
+            DebugLogger.Log($"Starting to load BOOTHLM database from: {dbPath}");
+
             if (!File.Exists(dbPath))
             {
-                Debug.LogWarning($"BOOTHLM database file not found at: {dbPath}");
+                DebugLogger.LogWarning($"BOOTHLM database file not found at: {dbPath}");
                 return null;
             }
 
@@ -57,6 +59,7 @@ namespace UnityEditorAssetBrowser.Helper
                 // SQLiteConnectionを作成（SQLite4Unity3d）
                 using (var connection = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly))
                 {
+                    DebugLogger.Log("SQLite DB connected.");
                     // アイテム情報の取得クエリ
                     string query = @"
                         SELECT 
@@ -99,14 +102,15 @@ namespace UnityEditorAssetBrowser.Helper
                     }
                 }
                 
+                DebugLogger.Log($"Loaded {items.Count} items from BOOTHLM database.");
                 return new BOOTHLMDatabase(items);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Failed to load BOOTHLM database: {ex.Message}\n{ex.StackTrace}");
+                DebugLogger.LogError($"Failed to load BOOTHLM database: {ex.Message}\n{ex.StackTrace}");
                 if (ex.InnerException != null)
                 {
-                    Debug.LogError($"Inner Exception: {ex.InnerException.Message}\n{ex.InnerException.StackTrace}");
+                    DebugLogger.LogError($"Inner Exception: {ex.InnerException.Message}\n{ex.InnerException.StackTrace}");
                 }
                 return null;
             }

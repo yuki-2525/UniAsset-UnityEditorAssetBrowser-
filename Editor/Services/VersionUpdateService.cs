@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -440,13 +441,18 @@ namespace UnityEditorAssetBrowser.Services
                 try
                 {
                     var jsonData = request.downloadHandler.text;
+                    DebugLogger.Log($"Version check response received: {jsonData}");
                     var remoteInfo = ParseRemoteVersionInfo(jsonData);
                     if (remoteInfo != null) HandleVersionInfo(currentVersion, remoteInfo);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Ignored
+                    DebugLogger.LogError($"Version check process failed: {ex.Message}");
                 }
+            }
+            else
+            {
+                DebugLogger.LogWarning($"Version check failed: {request.error}");
             }
         }
 
@@ -574,9 +580,14 @@ namespace UnityEditorAssetBrowser.Services
                 var timeSinceLastCheck = DateTime.Now - lastCheckDate;
 
                 // 24時間以内にチェック済みの場合はスキップ
-                if (timeSinceLastCheck < TimeSpan.FromHours(VERSION_CHECK_INTERVAL_HOURS)) return;
+                if (timeSinceLastCheck < TimeSpan.FromHours(VERSION_CHECK_INTERVAL_HOURS))
+                {
+                    DebugLogger.Log("Skipping version check (checked within 24 hours).");
+                    return;
+                }
             }
             
+            DebugLogger.Log("Checking for updates...");
             // バージョンチェックを実行
             FetchRemoteVersion();
         }

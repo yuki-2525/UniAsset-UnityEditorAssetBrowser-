@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -10,6 +10,7 @@ using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -32,31 +33,34 @@ namespace UnityEditorAssetBrowser.Services
         /// <returns>見つかったUnityPackageファイルのパス配列。ディレクトリが存在しない場合は空の配列を返す</returns>
         public static string[] FindUnityPackages(string directory)
         {
+            DebugLogger.Log($"Finding UnityPackages in: {directory}");
             if (directory == null)
             {
-                Debug.LogError(LocalizationService.Instance.GetString("error_directory_null"));
+                DebugLogger.LogError(LocalizationService.Instance.GetString("error_directory_null"));
                 return Array.Empty<string>();
             }
 
             if (string.IsNullOrEmpty(directory))
             {
-                Debug.LogError(LocalizationService.Instance.GetString("error_directory_empty"));
+                DebugLogger.LogError(LocalizationService.Instance.GetString("error_directory_empty"));
                 return Array.Empty<string>();
             }
 
             if (!Directory.Exists(directory))
             {
-                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_directory_not_found"), directory));
+                DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_directory_not_found"), directory));
                 return Array.Empty<string>();
             }
 
             try
             {
-                return Directory.GetFiles(directory, "*.unitypackage", SearchOption.AllDirectories);
+                var files = Directory.GetFiles(directory, "*.unitypackage", SearchOption.AllDirectories);
+                DebugLogger.Log($"Found {files.Length} packages.");
+                return files;
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException || ex is PathTooLongException)
             {
-                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_search_unitypackage"), ex.Message));
+                DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_search_unitypackage"), ex.Message));
                 return Array.Empty<string>();
             }
         }
@@ -84,18 +88,22 @@ namespace UnityEditorAssetBrowser.Services
             string processedImagePath = imagePath;
             string? tempImagePath = null;
 
+            DebugLogger.Log($"ImportPackageAndSetThumbnails: {packagePath}, GenerateThumbnail: {generateThumbnail}");
+
             try
             {
                 if (generateThumbnail && IsUrl(imagePath))
                 {
                     try
                     {
+                        DebugLogger.Log($"Downloading thumbnail from URL: {imagePath}");
                         processedImagePath = await DownloadAndResizeImageAsync(imagePath);
                         tempImagePath = processedImagePath;
+                        DebugLogger.Log($"Downloaded to: {tempImagePath}");
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
+                        DebugLogger.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
                     }
                 }
 
@@ -107,6 +115,7 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     try
                     {
+                        DebugLogger.Log($"Modifying package structure for category: {category}");
                         // クリーンアップ（前回のゴミがあれば）
                         UnityPackageModifier.Cleanup();
 
@@ -117,10 +126,11 @@ namespace UnityEditorAssetBrowser.Services
                         EditorUtility.DisplayProgressBar("Preparing Package", "Modifying package structure...", 0.5f);
                         pathToImport = await UnityPackageModifier.CreateModifiedPackageAsync(packagePath, targetFolderName);
                         isModified = true;
+                        DebugLogger.Log($"Modified package created at: {pathToImport}");
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_modify_package"), ex.Message));
+                        DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_modify_package"), ex.Message));
                         pathToImport = packagePath;
                         isModified = false;
                     }
@@ -176,7 +186,7 @@ namespace UnityEditorAssetBrowser.Services
                         }
                         catch (Exception ex) 
                         { 
-                            Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_delete_temp_package_failed"), pathToImport, ex.Message));
+                            DebugLogger.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_delete_temp_package_failed"), pathToImport, ex.Message));
                         }
                     }
 
@@ -188,7 +198,7 @@ namespace UnityEditorAssetBrowser.Services
                         }
                         catch (Exception ex)
                         {
-                            Debug.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
+                            DebugLogger.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
                         }
                     }
                 }
@@ -215,13 +225,13 @@ namespace UnityEditorAssetBrowser.Services
                             }
                             else
                             {
-                                Debug.LogWarning(LocalizationService.Instance.GetString("warning_new_folder_not_found"));
+                                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_new_folder_not_found"));
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_post_import_failed"), ex.Message));
+                        DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_post_import_failed"), ex.Message));
                     }
                     finally
                     {
@@ -240,7 +250,7 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     DeleteTempPackage();
                     UnregisterHandlers();
-                    Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_import_failed"), error));
+                    DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_import_failed"), error));
                 };
 
                 AssetDatabase.importPackageCompleted += _importCompletedHandler;
@@ -250,7 +260,7 @@ namespace UnityEditorAssetBrowser.Services
             catch (Exception ex)
             {
                 string errorMessage = string.Format(LocalizationService.Instance.GetString("error_package_import_failed"), ex.Message);
-                Debug.LogError(errorMessage);
+                DebugLogger.LogError(errorMessage);
                 onPreImportError?.Invoke(errorMessage);
             }
         }
@@ -301,7 +311,7 @@ namespace UnityEditorAssetBrowser.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
+                    DebugLogger.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
                     return;
                 }
             }
@@ -327,7 +337,7 @@ namespace UnityEditorAssetBrowser.Services
 
                 if (!targetFolders.Any())
                 {
-                    Debug.LogWarning(LocalizationService.Instance.GetString("warning_target_folder_not_found"));
+                    DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_target_folder_not_found"));
                     return;
                 }
 
@@ -344,7 +354,7 @@ namespace UnityEditorAssetBrowser.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
+                        DebugLogger.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
                     }
                 }
             }
@@ -357,13 +367,13 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (folders == null || !folders.Any())
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_folder_not_specified"));
+                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_folder_not_specified"));
                 return false;
             }
 
             if (string.IsNullOrEmpty(imagePath))
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_thumbnail_path_not_specified"));
+                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_thumbnail_path_not_specified"));
                 return false;
             }
 
@@ -377,13 +387,13 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (string.IsNullOrEmpty(imagePath))
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_full_image_path_failed"));
+                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_full_image_path_failed"));
                 return string.Empty;
             }
 
             if (!File.Exists(imagePath))
             {
-                Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_not_found"), imagePath));
+                DebugLogger.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_not_found"), imagePath));
                 return string.Empty;
             }
 
@@ -577,7 +587,7 @@ namespace UnityEditorAssetBrowser.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_copy_failed"), folder, ex.Message));
+                    DebugLogger.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_copy_failed"), folder, ex.Message));
                 }
             }
 

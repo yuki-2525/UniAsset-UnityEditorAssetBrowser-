@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 using System;
 using System.Collections.Generic;
@@ -236,6 +236,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="value">設定するアセットタイプのインデックス</param>
         private void SaveCategoryAssetType(string category, int value)
         {
+            DebugLogger.Log($"Saving AssetType for category '{category}': {value}");
             var key = PREFS_KEY_PREFIX + category;
             EditorPrefs.SetInt(key, value);
         }
@@ -245,6 +246,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void SaveBOOTHLMCategoryAssetType(string category, int value)
         {
+            DebugLogger.Log($"Saving BOOTHLM AssetType for category '{category}': {value}");
             var key = PREFS_KEY_BOOTHLM_PREFIX + category;
             EditorPrefs.SetInt(key, value);
         }
@@ -264,6 +266,7 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void SaveExcludeFoldersAndCombined()
         {
+            DebugLogger.Log("Saving exclude folders settings.");
             ExcludeFolderService.SaveExcludeFolders(
                 _userExcludeFolders,
                 _enabledDefaultExcludeFolders.ToList()

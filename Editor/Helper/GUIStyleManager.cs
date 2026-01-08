@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -47,6 +47,10 @@ namespace UnityEditorAssetBrowser.Helper
             int size = FontSize;
             if (_currentFontSize != size)
             {
+                if (_currentFontSize != -1)
+                {
+                    DebugLogger.Log($"Font size changed from {_currentFontSize} to {size}. Rebuilding styles.");
+                }
                 _currentFontSize = size;
                 _titleStyle = null;
                 _boxStyle = null;

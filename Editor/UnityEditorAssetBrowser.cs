@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -56,6 +56,7 @@ namespace UnityEditorAssetBrowser
             var window = GetWindow<UnityEditorAssetBrowser>();
             window.titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
             window.Show();
+            Helper.DebugLogger.Log("UnityEditorAssetBrowser window shown.");
         }
 
         /// <summary>
@@ -63,6 +64,7 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnEnable()
         {
+            Helper.DebugLogger.Log("UnityEditorAssetBrowser OnEnable called.");
             titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
             LocalizationService.Instance.OnLanguageChanged += UpdateTitle;
 
@@ -186,6 +188,7 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnHierarchyChanged()
         {
+            Helper.DebugLogger.Log("Hierarchy changed. Reloading databases and clearing image cache.");
             // 画像キャッシュをクリア
             ImageServices.Instance.ClearCache();
 

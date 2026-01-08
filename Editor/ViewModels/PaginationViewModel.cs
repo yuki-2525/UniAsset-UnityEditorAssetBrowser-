@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Models;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.ViewModels
 {
@@ -78,14 +79,22 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <param name="totalPages">総ページ数</param>
         /// <returns>移動が成功したかどうか（現在のページが最後のページの場合はfalse）</returns>
         public bool MoveToNextPage(int totalPages)
-            => _paginationInfo.MoveToNextPage(totalPages);
+        {
+            bool result = _paginationInfo.MoveToNextPage(totalPages);
+            if (result) DebugLogger.Log($"Moved to next page: {_paginationInfo.CurrentPage}");
+            return result;
+        }
 
         /// <summary>
         /// 前のページに移動
         /// </summary>
         /// <returns>移動が成功したかどうか（現在のページが1ページ目の場合はfalse）</returns>
         public bool MoveToPreviousPage()
-            => _paginationInfo.MoveToPreviousPage();
+        {
+            bool result = _paginationInfo.MoveToPreviousPage();
+            if (result) DebugLogger.Log($"Moved to previous page: {_paginationInfo.CurrentPage}");
+            return result;
+        }
 
         /// <summary>
         /// 指定したページに移動
@@ -94,7 +103,11 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <param name="totalPages">総ページ数</param>
         /// <returns>移動が成功したかどうか（ページ番号が無効な場合はfalse）</returns>
         public bool MoveToPage(int page, int totalPages)
-            => _paginationInfo.MoveToPage(page, totalPages);
+        {
+            bool result = _paginationInfo.MoveToPage(page, totalPages);
+            if (result) DebugLogger.Log($"Moved to page: {page}");
+            return result;
+        }
 
         /// <summary>
         /// 現在のタブのアイテムを取得

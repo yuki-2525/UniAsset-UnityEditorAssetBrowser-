@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -55,6 +55,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             if (GUILayout.Button(LocalizationService.Instance.GetString("prev_page"), GUIStyleManager.Button, GUILayout.Width(100)))
             {
+                DebugLogger.Log("Previous page button clicked");
                 _paginationViewModel.MoveToPreviousPage();
             }
         }
@@ -82,6 +83,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             if (GUILayout.Button(LocalizationService.Instance.GetString("next_page"), GUIStyleManager.Button, GUILayout.Width(100)))
             {
+                DebugLogger.Log("Next page button clicked");
                 var currentItems = _paginationViewModel.GetCurrentTabItems(
                     () => _assetBrowserViewModel.GetFilteredAvatars(),
                     () => _assetBrowserViewModel.GetFilteredItems(),

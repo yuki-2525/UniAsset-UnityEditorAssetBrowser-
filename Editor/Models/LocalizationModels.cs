@@ -1,3 +1,6 @@
+// Copyright (c) 2025-2026 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
+
 using System;
 using System.Collections.Generic;
 

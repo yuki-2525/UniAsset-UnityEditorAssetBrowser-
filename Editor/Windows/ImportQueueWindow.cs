@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -21,6 +21,7 @@ namespace UnityEditorAssetBrowser.Windows
         [MenuItem("Window/UniAsset Import List")]
         public static void ShowWindow()
         {
+            DebugLogger.Log("Opening ImportQueueWindow.");
             var window = GetWindow<ImportQueueWindow>();
             window.titleContent = new GUIContent("Import List");
             window.Show();
@@ -45,11 +46,13 @@ namespace UnityEditorAssetBrowser.Windows
 
         private void OnImportProgress(int current, int total)
         {
+            DebugLogger.Log($"Import progress: {current}/{total}");
             Repaint();
         }
 
         private void OnImportCompleted()
         {
+            DebugLogger.Log("Import completed.");
             Repaint();
             ShowNotification(new GUIContent(LocalizationService.Instance.GetString("import_completed") ?? "Import Completed"));
         }
@@ -132,12 +135,14 @@ namespace UnityEditorAssetBrowser.Windows
             
             if (GUILayout.Button(LocalizationService.Instance.GetString("clear_list") ?? "Clear List"))
             {
+                DebugLogger.Log("Clear Import Queue List button clicked.");
                 ImportQueueService.Instance.Clear();
             }
 
             GUI.enabled = !ImportQueueService.Instance.IsImporting && ImportQueueService.Instance.Queue.Count > 0;
             if (GUILayout.Button(LocalizationService.Instance.GetString("start_import") ?? "Start Import", GUILayout.Height(30)))
             {
+                DebugLogger.Log("Start Import button clicked.");
                 ImportQueueService.Instance.StartImport();
             }
             GUI.enabled = true;
@@ -168,10 +173,12 @@ namespace UnityEditorAssetBrowser.Windows
 
                         if (genericData is Models.ImportQueueItem item)
                         {
+                            DebugLogger.Log($"Dropped internal item to Import Queue: {item.PackageName}");
                             ImportQueueService.Instance.Add(item.PackagePath, item.PackageName, item.ThumbnailPath, item.Category);
                         }
                         else if (paths != null && paths.Length > 0)
                         {
+                            DebugLogger.Log($"Dropped files to Import Queue: {string.Join(", ", paths)}");
                             // 外部ファイル（エクスプローラー等）からのD&D対応も可能ならここで行う
                             // 今回は要件に「アセット閲覧ウィンドウから」とあるので、内部D&Dが主
                         }

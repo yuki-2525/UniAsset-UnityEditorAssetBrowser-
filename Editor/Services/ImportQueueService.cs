@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Models;
+using UnityEditorAssetBrowser.Helper;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Services
@@ -40,7 +41,10 @@ namespace UnityEditorAssetBrowser.Services
         public void Add(string packagePath, string packageName, string thumbnailPath, string category)
         {
             if (_queue.Any(x => x.PackagePath == packagePath))
+            {
+                DebugLogger.Log($"Queue already contains: {packageName}");
                 return;
+            }
 
             _queue.Add(new ImportQueueItem
             {
@@ -50,6 +54,7 @@ namespace UnityEditorAssetBrowser.Services
                 Category = category
             });
             OnQueueChanged?.Invoke();
+            DebugLogger.Log($"Added to import queue: {packageName}");
         }
 
         /// <summary>
@@ -59,6 +64,7 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (index >= 0 && index < _queue.Count)
             {
+                DebugLogger.Log($"Removing from import queue: {_queue[index].PackageName}");
                 _queue.RemoveAt(index);
                 OnQueueChanged?.Invoke();
             }
@@ -83,6 +89,7 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public void Clear()
         {
+            DebugLogger.Log("Clearing import queue.");
             _queue.Clear();
             OnQueueChanged?.Invoke();
         }
@@ -93,6 +100,8 @@ namespace UnityEditorAssetBrowser.Services
         public void StartImport()
         {
             if (_isImporting || _queue.Count == 0) return;
+
+            DebugLogger.Log($"Starting batch import. Items: {_queue.Count}");
 
             _isImporting = true;
             _currentImportIndex = 0;
@@ -112,7 +121,7 @@ namespace UnityEditorAssetBrowser.Services
             var item = _queue[_currentImportIndex];
             OnImportProgress?.Invoke(_currentImportIndex + 1, _queue.Count);
 
-            Debug.Log($"[UniAsset] Importing ({_currentImportIndex + 1}/{_queue.Count}): {item.PackageName}");
+            DebugLogger.Log($"Importing ({_currentImportIndex + 1}/{_queue.Count}): {item.PackageName}");
 
             // イベントハンドラ登録
             AssetDatabase.importPackageCompleted += OnPackageImportCompleted;
@@ -131,7 +140,7 @@ namespace UnityEditorAssetBrowser.Services
                     false, // showDialog
                     (error) => // onPreImportError
                     {
-                        Debug.LogError($"[UniAsset] Pre-import error for {item.PackageName}: {error}");
+                        DebugLogger.LogError($"Pre-import error for {item.PackageName}: {error}");
                         UnregisterHandlers();
                         _currentImportIndex++;
                         ProcessNextImport();
@@ -140,7 +149,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[UniAsset] Failed to start import for {item.PackageName}: {ex.Message}");
+                DebugLogger.LogError($"Failed to start import for {item.PackageName}: {ex.Message}");
                 UnregisterHandlers();
                 // エラーでも次へ進む
                 _currentImportIndex++;
@@ -158,7 +167,7 @@ namespace UnityEditorAssetBrowser.Services
 
         private void OnPackageImportFailed(string packageName, string errorMessage)
         {
-            Debug.LogError($"[UniAsset] Import failed for {packageName}: {errorMessage}");
+            DebugLogger.LogError($"Import failed for {packageName}: {errorMessage}");
             UnregisterHandlers();
             _currentImportIndex++;
             EditorApplication.delayCall += ProcessNextImport;
@@ -166,7 +175,7 @@ namespace UnityEditorAssetBrowser.Services
 
         private void OnPackageImportCancelled(string packageName)
         {
-            Debug.LogWarning($"[UniAsset] Import cancelled for {packageName}");
+            DebugLogger.LogWarning($"Import cancelled for {packageName}");
             UnregisterHandlers();
             _currentImportIndex++;
             EditorApplication.delayCall += ProcessNextImport;
@@ -182,7 +191,7 @@ namespace UnityEditorAssetBrowser.Services
         private void FinishImport()
         {
             _isImporting = false;
-            Debug.Log("[UniAsset] Batch import completed.");
+            DebugLogger.Log("Batch import completed.");
             
             // インポート完了時にリストをクリア
             Clear();

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -68,6 +68,7 @@ namespace UnityEditorAssetBrowser.Views
             );
             if (newShowAdvancedSearch != _searchViewModel.SearchCriteria.ShowAdvancedSearch)
             {
+                DebugLogger.Log($"Advanced search toggle: {newShowAdvancedSearch}");
                 _searchViewModel.SearchCriteria.ShowAdvancedSearch = newShowAdvancedSearch;
                 _paginationViewModel.ResetPage();
                 GUI.changed = true;
@@ -78,6 +79,7 @@ namespace UnityEditorAssetBrowser.Views
             var clearWidth = GUIStyleManager.Button.CalcSize(new GUIContent(clearLabel)).x + 10;
             if (GUILayout.Button(clearLabel, GUIStyleManager.Button, GUILayout.Width(clearWidth)))
             {
+                DebugLogger.Log("Clear search button clicked");
                 _searchViewModel.ClearSearchCriteria();
                 _paginationViewModel.ResetPage();
                 OnSearchResultChanged();
