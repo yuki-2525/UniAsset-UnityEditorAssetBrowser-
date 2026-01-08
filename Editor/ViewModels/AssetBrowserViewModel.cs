@@ -41,6 +41,13 @@ namespace UnityEditorAssetBrowser.ViewModels
         private readonly SearchViewModel _searchViewModel;
         private string? _lastError;
 
+        private BOOTHLMList? _currentList;
+        public BOOTHLMList? CurrentList
+        {
+             get => _currentList;
+             set => _currentList = value;
+        }
+
         public string? LastError => _lastError;
 
         public SortMethod CurrentSortMethod => _currentSortMethod;
@@ -262,6 +269,43 @@ namespace UnityEditorAssetBrowser.ViewModels
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
         }
 
+        private Dictionary<string, (int TotalCount, List<BOOTHLMItem> Items)> _listPreviewCache = new Dictionary<string, (int, List<BOOTHLMItem>)>();
+
+        /// <summary>
+        /// 選択されたリストのアイテムを取得
+        /// </summary>
+        public List<IDatabaseItem> GetListTabItems()
+        {
+            if (_currentList == null) return new List<IDatabaseItem>();
+
+            var items = DatabaseService.GetItemsForBOOTHLMList(_currentList)
+                            .Cast<IDatabaseItem>()
+                            .ToList();
+            
+            return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
+        }
+        
+        /// <summary>
+        /// リストのプレビュー用アイテムを取得（キャッシュあり）
+        /// </summary>
+        public (int TotalCount, List<BOOTHLMItem> Items) GetListPreviewItems(BOOTHLMList list)
+        {
+            string cacheKey = $"{list.Type}_{list.Id}";
+            if (_listPreviewCache.TryGetValue(cacheKey, out var cachedData))
+            {
+                return cachedData;
+            }
+
+            var result = DatabaseService.GetPreviewItemsForBOOTHLMList(list, 5);
+            _listPreviewCache[cacheKey] = result;
+            return result;
+        }
+
+        public void ClearListPreviewCache()
+        {
+            _listPreviewCache.Clear();
+        }
+
         /// <summary>
         /// その他のアセットをフィルタリングして取得
         /// </summary>
@@ -407,6 +451,7 @@ namespace UnityEditorAssetBrowser.ViewModels
         )
         {
             DebugLogger.Log("UpdateDatabases called");
+            ClearListPreviewCache();
             // データベースがnullの場合は、即座に更新を完了
             if (
                 aeDatabase == null
@@ -432,6 +477,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             _kaWorldObjectsDatabase = kaWorldObjectsDatabase;
             _kaOtherAssetsDatabase = kaOtherAssetsDatabase;
             _boothlmDatabase = boothlmDatabase;
+            _currentList = null; 
         }
     }
 }

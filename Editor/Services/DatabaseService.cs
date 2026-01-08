@@ -5,6 +5,8 @@
 #nullable enable
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.IO;
 using UnityEditor;
 using UnityEditorAssetBrowser.Helper;
@@ -426,6 +428,50 @@ namespace UnityEditorAssetBrowser.Services
         /// <returns>データベース（存在しない場合はnull）</returns>
         public static BOOTHLMDatabase? GetBOOTHLMDatabase()
             => _boothlmDatabase;
+
+        public static List<BOOTHLMList> GetBOOTHLMLists()
+        {
+            return GetBOOTHLMDatabase()?.Lists ?? new List<BOOTHLMList>();
+        }
+
+        public static List<BOOTHLMItem> GetItemsForBOOTHLMList(BOOTHLMList list)
+        {
+            var ids = BOOTHLMDatabaseHelper.GetListItemRegisteredIds(list);
+            var database = GetBOOTHLMDatabase();
+            if (database == null) return new List<BOOTHLMItem>();
+
+            // IDリストに含まれるアイテムを抽出
+            var idSet = new HashSet<string>(ids);
+            return database.Items.Where(i => idSet.Contains(i.RegisteredId)).ToList();
+        }
+
+        public static (int TotalCount, List<BOOTHLMItem> PreviewItems) GetPreviewItemsForBOOTHLMList(BOOTHLMList list, int count = 5)
+        {
+            // 全IDを取得して総数を把握
+            var allIds = BOOTHLMDatabaseHelper.GetListItemRegisteredIds(list);
+            int totalCount = allIds.Count;
+            
+            // プレビュー用に指定数だけ取得
+            var previewIds = allIds.Take(count).ToList();
+            
+            var database = GetBOOTHLMDatabase();
+            if (database == null) return (0, new List<BOOTHLMItem>());
+
+            // IDリストに含まれるアイテムを抽出
+            var idSet = new HashSet<string>(previewIds);
+            var items = database.Items.Where(i => idSet.Contains(i.RegisteredId)).ToList();
+            
+            // 取得順序を維持するために並び替え
+            var orderedItems = new List<BOOTHLMItem>();
+            foreach (var id in previewIds)
+            {
+                var item = items.FirstOrDefault(i => i.RegisteredId == id);
+                if (item != null) orderedItems.Add(item);
+            }
+            
+            return (totalCount, orderedItems);
+        }
+
 
         /// <summary>
         /// AvatarExplorerデータベースをクリアする

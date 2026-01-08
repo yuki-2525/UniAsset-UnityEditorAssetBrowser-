@@ -272,7 +272,8 @@ namespace UnityEditorAssetBrowser.Views
                 () => _assetBrowserViewModel.GetFilteredAvatars(),
                 () => _assetBrowserViewModel.GetFilteredItems(),
                 () => _assetBrowserViewModel.GetFilteredWorldObjects(),
-                () => _assetBrowserViewModel.GetFilteredOthers()
+                () => _assetBrowserViewModel.GetFilteredOthers(),
+                () => _assetBrowserViewModel.GetListTabItems()
             );
 
             return totalItems;
@@ -362,6 +363,7 @@ namespace UnityEditorAssetBrowser.Views
                 1 => _assetBrowserViewModel.GetFilteredItems(),
                 2 => _assetBrowserViewModel.GetFilteredWorldObjects(),
                 3 => _assetBrowserViewModel.GetFilteredOthers(),
+                4 => _assetBrowserViewModel.GetListTabItems(),
                 _ => new List<IDatabaseItem>()
             };
         }

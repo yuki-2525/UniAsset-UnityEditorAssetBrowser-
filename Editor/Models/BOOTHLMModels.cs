@@ -15,11 +15,27 @@ namespace UnityEditorAssetBrowser.Models
     public class BOOTHLMDatabase
     {
         public List<BOOTHLMItem> Items { get; set; } = new List<BOOTHLMItem>();
+        public List<BOOTHLMList> Lists { get; set; } = new List<BOOTHLMList>();
 
-        public BOOTHLMDatabase(IEnumerable<BOOTHLMItem> items)
+        public BOOTHLMDatabase(IEnumerable<BOOTHLMItem> items, IEnumerable<BOOTHLMList> lists)
         {
             Items = new List<BOOTHLMItem>(items);
+            Lists = new List<BOOTHLMList>(lists);
         }
+    }
+
+    public enum BOOTHLMListType
+    {
+        Normal,
+        Smart
+    }
+
+    public class BOOTHLMList
+    {
+        public int Id { get; set; }
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public BOOTHLMListType Type { get; set; }
     }
 
     /// <summary>

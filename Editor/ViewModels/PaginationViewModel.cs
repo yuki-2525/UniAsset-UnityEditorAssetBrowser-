@@ -115,13 +115,15 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <param name="getFilteredAvatars">フィルターされたアバターを取得する関数</param>
         /// <param name="getFilteredItems">フィルターされたアイテムを取得する関数</param>
         /// <param name="getFilteredWorldObjects">フィルターされたワールドオブジェクトを取得する関数</param>
+        /// <param name="getListTabItems">リストタブのアイテムを取得する関数</param>
         /// <param name="getFilteredOthers">フィルターされたその他のアイテムを取得する関数</param>
         /// <returns>現在のタブのアイテムリスト</returns>
         public List<IDatabaseItem> GetCurrentTabItems(
             Func<List<IDatabaseItem>> getFilteredAvatars,
             Func<List<IDatabaseItem>> getFilteredItems,
             Func<List<IDatabaseItem>> getFilteredWorldObjects,
-            Func<List<IDatabaseItem>> getFilteredOthers
+            Func<List<IDatabaseItem>> getFilteredOthers,
+            Func<List<IDatabaseItem>> getListTabItems
         )
         {
             return _paginationInfo.SelectedTab switch
@@ -130,6 +132,7 @@ namespace UnityEditorAssetBrowser.ViewModels
                 1 => getFilteredItems(),
                 2 => getFilteredWorldObjects(),
                 3 => getFilteredOthers(),
+                4 => getListTabItems(),
                 _ => new List<IDatabaseItem>(),
             };
         }

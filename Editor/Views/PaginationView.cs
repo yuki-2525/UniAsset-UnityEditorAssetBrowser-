@@ -69,7 +69,8 @@ namespace UnityEditorAssetBrowser.Views
                 () => _assetBrowserViewModel.GetFilteredAvatars(),
                 () => _assetBrowserViewModel.GetFilteredItems(),
                 () => _assetBrowserViewModel.GetFilteredWorldObjects(),
-                () => _assetBrowserViewModel.GetFilteredOthers()
+                () => _assetBrowserViewModel.GetFilteredOthers(),
+                () => _assetBrowserViewModel.GetListTabItems()
             );
             
             int totalPages = _paginationViewModel.GetTotalPages(currentItems);
@@ -88,7 +89,8 @@ namespace UnityEditorAssetBrowser.Views
                     () => _assetBrowserViewModel.GetFilteredAvatars(),
                     () => _assetBrowserViewModel.GetFilteredItems(),
                     () => _assetBrowserViewModel.GetFilteredWorldObjects(),
-                    () => _assetBrowserViewModel.GetFilteredOthers()
+                    () => _assetBrowserViewModel.GetFilteredOthers(),
+                    () => _assetBrowserViewModel.GetListTabItems()
                 );
 
                 int totalPages = _paginationViewModel.GetTotalPages(currentItems);
