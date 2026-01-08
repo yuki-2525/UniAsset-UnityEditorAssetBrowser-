@@ -145,8 +145,15 @@ namespace UnityEditorAssetBrowser.Views
             DrawSetFolderThumbnailButton(imagePath);
             DrawExplorerOpenButton(itemPath);
 
-            if (boothItemId <= 0) return;
-            DrawBoothOpenButton(boothItemId);
+            if (boothItemId > 0)
+            {
+                DrawBoothOpenButton(boothItemId);
+            }
+
+            if (!Directory.Exists(itemPath))
+            {
+                EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("download_data_missing"), MessageType.Info);
+            }
         }
 
         /// <summary>

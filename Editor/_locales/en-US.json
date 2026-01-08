@@ -133,5 +133,6 @@
   "dialog_info": "Regardless of this setting, the dialog will not be shown during batch import.",
   "open_import_list": "Open Import List",
   "import_list_help": "You can add items to this list by right-clicking a unitypackage or by dragging and dropping it here.",
-  "set_folder_thumbnail": "Set Folder Thumbnail"
+  "set_folder_thumbnail": "Set Folder Thumbnail",
+  "download_data_missing": "Download data missing"
 }

@@ -133,5 +133,6 @@
   "dialog_info": "この設定に関わらず、一括インポート時はダイアログが表示されません",
   "open_import_list": "インポートリストを開く",
   "import_list_help": "UnityPackageを右クリックするか、ここにドラッグ＆ドロップすることでリストに追加できます。",
-  "set_folder_thumbnail": "フォルダにサムネイルを付与"
+  "set_folder_thumbnail": "フォルダにサムネイルを付与",
+  "download_data_missing": "ダウンロードデータが存在しません"
 }

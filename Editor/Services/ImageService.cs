@@ -14,6 +14,7 @@ using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Helper;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEngine.Profiling;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -25,8 +26,14 @@ namespace UnityEditorAssetBrowser.Services
     {
         private static ImageServices? instance;
 
-        /// <summary>キャッシュの最大サイズ</summary>
-        private int MAX_CACHE_SIZE = 50;
+        /// <summary>キャッシュの最大サイズ (件数ベース - 非推奨)</summary>
+        // private int MAX_CACHE_SIZE = 50;
+
+        /// <summary>キャッシュの最大容量 (バイト) - デフォルト 128MB</summary>
+        private const long MAX_CACHE_MEMORY_SIZE = 128L * 1024L * 1024L;
+
+        /// <summary>現在のキャッシュ使用量 (バイト)</summary>
+        private long _currentCacheMemoryUsage = 0;
 
         /// <summary>
         /// 画像のキャッシュ
@@ -87,6 +94,12 @@ namespace UnityEditorAssetBrowser.Services
                 // LRU更新: 最近使用したアイテムをリストの末尾に移動
                 UpdateAccessOrder(path);
                 return cachedTexture;
+            }
+
+            // 既に読み込み中の場合はプレースホルダーを返す
+            if (_loadingImages.Contains(path))
+            {
+                return _placeholderTexture;
             }
 
             // URLの場合は非同期読み込みを開始してプレースホルダーを返す
@@ -261,6 +274,14 @@ namespace UnityEditorAssetBrowser.Services
                 onComplete?.Invoke(cachedTexture);
                 return;
             }
+
+            // 既に読み込み中の場合はスキップ
+            if (_loadingImages.Contains(path))
+            {
+                // DebugLogger.Log($"Image loading already in progress, skipping: {path}");
+                return;
+            }
+
             _loadingImages.Add(path);
 
             if (path.StartsWith("http://") || path.StartsWith("https://"))
@@ -337,6 +358,7 @@ namespace UnityEditorAssetBrowser.Services
             _nodeMap.Clear();
             _currentVisibleImages.Clear();
             _loadingImages.Clear();
+            _currentCacheMemoryUsage = 0;
         }
 
         /// <summary>
@@ -413,12 +435,14 @@ namespace UnityEditorAssetBrowser.Services
                 }
             }
 
-            // 不要になった画像をキャッシュから削除
+            // 不要になった画像をキャッシュから削除（LRUに任せるため、即時削除は行わない）
+            /*
             var imagesToRemove = _currentVisibleImages.Except(newVisibleImages).ToList();
             foreach (var imagePath in imagesToRemove)
             {
                 RemoveFromCache(imagePath);
             }
+            */
 
             _currentVisibleImages.Clear();
             foreach (var path in newVisibleImages)
@@ -438,18 +462,13 @@ namespace UnityEditorAssetBrowser.Services
 
         /// <summary>
         /// 検索結果に応じてキャッシュサイズを適応的に調整
+        /// (容量ベースへの移行に伴い廃止)
         /// </summary>
         /// <param name="searchResultCount">検索結果の件数</param>
         public void AdaptCacheSizeToSearchResults(int searchResultCount)
         {
-            var newMaxSize = GetOptimalCacheSize(searchResultCount);
-            if (newMaxSize < ImageCache.Count)
-            {
-                // キャッシュサイズを削減
-                RemoveOldestItems(ImageCache.Count - newMaxSize);
-            }
-
-            MAX_CACHE_SIZE = newMaxSize;
+            // 容量ベースの管理に移行したため、件数による調整は行わない
+            // 将来的にメモリ制限を動的に変える必要がある場合はここに実装
         }
 
         /// <summary>
@@ -457,8 +476,10 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         private void AddToCache(string path, Texture2D texture)
         {
-            // キャッシュサイズ制限チェック
-            while (ImageCache.Count >= MAX_CACHE_SIZE)
+            long textureSize = Profiler.GetRuntimeMemorySizeLong(texture);
+
+            // キャッシュサイズ制限チェック (容量ベース)
+            while (_currentCacheMemoryUsage + textureSize > MAX_CACHE_MEMORY_SIZE && ImageCache.Count > 0)
             {
                 RemoveOldestItem();
             }
@@ -466,6 +487,9 @@ namespace UnityEditorAssetBrowser.Services
             var node = _accessOrder.AddLast(path);
             ImageCache[path] = texture;
             _nodeMap[path] = node;
+            _currentCacheMemoryUsage += textureSize;
+            
+            // DebugLogger.Log($"Added to cache: {Path.GetFileName(path)} ({textureSize / 1024}KB). Total: {_currentCacheMemoryUsage / 1024 / 1024}MB / {MAX_CACHE_MEMORY_SIZE / 1024 / 1024}MB");
         }
 
         /// <summary>
@@ -510,7 +534,15 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (ImageCache.TryGetValue(path, out var texture))
             {
-                UnityEngine.Object.DestroyImmediate(texture);
+                if (texture != null)
+                {
+                    long textureSize = Profiler.GetRuntimeMemorySizeLong(texture);
+                    _currentCacheMemoryUsage -= textureSize;
+                    if (_currentCacheMemoryUsage < 0) _currentCacheMemoryUsage = 0;
+                    
+                    DebugLogger.Log($"Removed from cache: {Path.GetFileName(path)} (Freed: {textureSize / 1024}KB). Total: {_currentCacheMemoryUsage / 1024 / 1024}MB");
+                    UnityEngine.Object.DestroyImmediate(texture);
+                }
                 ImageCache.Remove(path);
             }
 

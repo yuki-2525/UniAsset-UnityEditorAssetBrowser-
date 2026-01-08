@@ -48,7 +48,7 @@ namespace UnityEditorAssetBrowser.Services
 
             if (!Directory.Exists(directory))
             {
-                DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_directory_not_found"), directory));
+                // ディレクトリが存在しない場合はエラーとせず空の配列を返す（UI側で警告表示するため）
                 return Array.Empty<string>();
             }
 
