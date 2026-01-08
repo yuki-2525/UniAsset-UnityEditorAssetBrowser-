@@ -123,6 +123,9 @@ namespace UnityEditorAssetBrowser
                 _searchViewModel
             );
             _assetItemView = new AssetItemView();
+
+            // ViewModelをDatabaseServiceに登録して、DB更新時にViewModelも更新されるようにする
+            DatabaseService.SetViewModels(_assetBrowserViewModel, _searchViewModel, _paginationViewModel);
         }
 
         /// <summary>

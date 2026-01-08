@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Windows
 {
-    public class SettingsWindow : EditorWindow
+    public class SettingsWindow : EditorWindow, IHasCustomMenu
     {
         private SettingsView _settingsView;
         private AssetBrowserViewModel _assetBrowserViewModel;
@@ -57,6 +57,19 @@ namespace UnityEditorAssetBrowser.Windows
         private void OnGUI()
         {
             _settingsView.Draw();
+        }
+
+        public void AddItemsToMenu(GenericMenu menu)
+        {
+            const string debugKey = "UniAsset_DebugMode";
+            bool isDebug = EditorPrefs.GetBool(debugKey, false);
+
+            menu.AddItem(new GUIContent("Debug Mode"), isDebug, () =>
+            {
+                bool newState = !isDebug;
+                EditorPrefs.SetBool(debugKey, newState);
+                Debug.Log($"[UniAsset] Debug Mode: {(newState ? "ON" : "OFF")}");
+            });
         }
     }
 }
