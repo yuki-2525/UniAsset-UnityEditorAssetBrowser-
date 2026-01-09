@@ -136,5 +136,7 @@
   "set_folder_thumbnail": "フォルダにサムネイルを付与",
   "download_data_missing": "ダウンロードデータが存在しません",
   "tab_list": "リスト",
-  "list_back": "リスト一覧に戻る"
+  "list_back": "リスト一覧に戻る",
+  "item_not_registered": "未登録のアイテムです",
+  "error_invalid_booth_id": "BOOTHのIDかURLを入力してください"
 }

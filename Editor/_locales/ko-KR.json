@@ -136,5 +136,7 @@
   "set_folder_thumbnail": "폴더에 썸네일 부여",
   "download_data_missing": "다운로드 데이터가 존재하지 않습니다",
   "tab_list": "목록",
-  "list_back": "목록으로 돌아가기"
+  "list_back": "목록으로 돌아가기",
+  "item_not_registered": "등록되지 않은 항목입니다",
+  "error_invalid_booth_id": "BOOTH ID 혹은 URL을 입력해 주세요"
 }

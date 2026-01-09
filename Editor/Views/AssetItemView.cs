@@ -47,18 +47,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             GUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
-            DrawItemHeader(
-                item.GetTitle(),
-                item.GetAuthor(),
-                item.GetImagePath(),
-                item.GetItemPath(),
-                item.GetCreatedDate(),
-                item.GetCategory(),
-                item.GetSupportedAvatars(),
-                item.GetTags(),
-                item.GetMemo(),
-                item.GetBoothId()
-            );
+            DrawItemHeader(item);
             DrawUnityPackageSection(item.GetItemPath(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
 
             GUILayout.EndVertical();
@@ -67,41 +56,21 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アイテムヘッダーの描画
         /// </summary>
-        /// <param name="title">タイトル</param>
-        /// <param name="author">作者名</param>
-        /// <param name="imagePath">画像パス</param>
-        /// <param name="itemPath">アイテムパス</param>
-        /// <param name="createdDate">作成日（ソート用）</param>
-        /// <param name="category">カテゴリ</param>
-        /// <param name="supportedAvatars">対応アバター</param>
-        /// <param name="tags">タグ</param>
-        /// <param name="memo">メモ</param>
-        /// <param name="boothItemId">BoothアイテムID</param>
-        private void DrawItemHeader(
-            string title,
-            string author,
-            string imagePath,
-            string itemPath,
-            DateTime createdDate,
-            string category,
-            string[] supportedAvatars,
-            string[] tags,
-            string memo,
-            int boothItemId = 0
-        )
+        /// <param name="item">アイテム</param>
+        private void DrawItemHeader(IDatabaseItem item)
         {
             GUILayout.BeginHorizontal();
 
-            DrawItemImage(imagePath);
+            DrawItemImage(item);
 
             GUILayout.BeginVertical();
             
-            DrawItemBasicInfo(title, author);
-            DrawItemMetadata(title, category, supportedAvatars, tags, memo);
-            DrawItemActionButtons(itemPath, boothItemId, imagePath);
-
-            GUILayout.EndVertical();
+            DrawItemBasicInfo(item.GetTitle(), item.GetAuthor());
+            DrawItemMetadata(item.GetTitle(), item.GetCategory(), item.GetSupportedAvatars(), item.GetTags(), item.GetMemo());
+            DrawItemActionButtons(item.GetItemPath(), item.GetBoothId(), item.GetImagePath());
             
+            GUILayout.EndVertical();
+
             GUILayout.EndHorizontal();
         }
 
@@ -265,9 +234,10 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アイテム画像の描画
         /// </summary>
-        /// <param name="imagePath">画像パス</param>
-        private void DrawItemImage(string imagePath)
+        /// <param name="item">表示するアイテム</param>
+        private void DrawItemImage(IDatabaseItem item)
         {
+            string imagePath = item.GetImagePath();
             if (string.IsNullOrEmpty(imagePath)) return;
 
             // URLまたはローカルファイルパスのチェック
@@ -279,6 +249,18 @@ namespace UnityEditorAssetBrowser.Views
 
                 int size = GUIStyleManager.IconSize;
                 GUILayout.Label(texture, GUILayout.Width(size), GUILayout.Height(size));
+
+                Rect imageRect = GUILayoutUtility.GetLastRect();
+                
+                // ドラッグ開始処理
+                if (Event.current.type == EventType.MouseDrag && imageRect.Contains(Event.current.mousePosition))
+                {
+                    DragAndDrop.PrepareStartDrag();
+                    DragAndDrop.SetGenericData("ImportQueue_DatabaseItem", item);
+                    DragAndDrop.objectReferences = new UnityEngine.Object[0];
+                    DragAndDrop.StartDrag(item.GetTitle());
+                    Event.current.Use();
+                }
             }
         }
 

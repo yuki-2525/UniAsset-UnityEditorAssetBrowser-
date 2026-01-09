@@ -136,5 +136,7 @@
   "set_folder_thumbnail": "Set Folder Thumbnail",
   "download_data_missing": "Download data missing",
   "tab_list": "List",
-  "list_back": "Back to List"
+  "list_back": "Back to List",
+  "item_not_registered": "Item not registered",
+  "error_invalid_booth_id": "Please enter a valid BOOTH ID or URL"
 }

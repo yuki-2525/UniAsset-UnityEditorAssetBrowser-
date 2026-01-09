@@ -162,7 +162,7 @@ namespace UnityEditorAssetBrowser.Views
             DrawScrollView(totalItems);
             
             // リスト選択画面ではページネーションを表示しない
-            if (!(_paginationViewModel.SelectedTab == 3 && _assetBrowserViewModel.CurrentList == null))
+            if (!(_paginationViewModel.SelectedTab == 4 && _assetBrowserViewModel.CurrentList == null))
             {
                 _paginationView.DrawPaginationButtons();
             }
