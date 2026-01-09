@@ -132,7 +132,7 @@
   "show_import_dialog": "インポート時に確認ダイアログを表示",
   "dialog_info": "この設定に関わらず、一括インポート時はダイアログが表示されません",
   "open_import_list": "インポートリストを開く",
-  "import_list_help": "UnityPackageを右クリックするか、ここにドラッグ＆ドロップすることでリストに追加できます。",
+  "import_list_help": "UnityPackageやサムネイルをここにドラッグ＆ドロップして追加できます。右クリックメニューや、下の入力欄（BOOTH ID/URL/画像リンク）からも追加可能です。",
   "set_folder_thumbnail": "フォルダにサムネイルを付与",
   "download_data_missing": "ダウンロードデータが存在しません",
   "tab_list": "リスト",

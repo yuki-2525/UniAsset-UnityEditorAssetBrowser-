@@ -132,7 +132,7 @@
   "show_import_dialog": "임포트 시 확인 대화상자 표시",
   "dialog_info": "이 설정과 관계없이 일괄 임포트 중에는 대화상자가 표시되지 않습니다.",
   "open_import_list": "임포트 목록 열기",
-  "import_list_help": "UnityPackage를 마우스 오른쪽 버튼으로 클릭하거나 여기로 드래그 앤 드롭하여 목록에 추가할 수 있습니다.",
+  "import_list_help": "UnityPackage나 썸네일을 여기로 드래그 앤 드롭하여 추가할 수 있습니다. 마우스 오른쪽 버튼 메뉴나 아래 입력란(BOOTH ID/URL/이미지 링크)을 통해서도 추가 가능합니다.",
   "set_folder_thumbnail": "폴더에 썸네일 부여",
   "download_data_missing": "다운로드 데이터가 존재하지 않습니다",
   "tab_list": "목록",

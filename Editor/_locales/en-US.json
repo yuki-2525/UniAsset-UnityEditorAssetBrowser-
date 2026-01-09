@@ -132,7 +132,7 @@
   "show_import_dialog": "Show confirmation dialog on import",
   "dialog_info": "Regardless of this setting, the dialog will not be shown during batch import.",
   "open_import_list": "Open Import List",
-  "import_list_help": "You can add items to this list by right-clicking a unitypackage or by dragging and dropping it here.",
+  "import_list_help": "Add items by dragging UnityPackages or thumbnails here. You can also use the right-click menu, or enter a BOOTH ID, URL, or image link below.",
   "set_folder_thumbnail": "Set Folder Thumbnail",
   "download_data_missing": "Download data missing",
   "tab_list": "List",
