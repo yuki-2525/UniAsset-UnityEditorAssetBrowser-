@@ -138,5 +138,7 @@
   "tab_list": "List",
   "list_back": "Back to List",
   "item_not_registered": "Item not registered",
-  "error_invalid_booth_id": "Please enter a valid BOOTH ID or URL"
+  "error_invalid_booth_id": "Please enter a valid BOOTH ID or URL",
+  "error_no_packages": "This item does not contain any UnityPackages",
+  "packages_added": "Added {0} packages"
 }

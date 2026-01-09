@@ -138,5 +138,7 @@
   "tab_list": "列表",
   "list_back": "返回列表",
   "item_not_registered": "未注册的项目",
-  "error_invalid_booth_id": "请输入有效的 BOOTH ID 或 URL"
+  "error_invalid_booth_id": "请输入有效的 BOOTH ID 或 URL",
+  "error_no_packages": "该项目中不包含 UnityPackage",
+  "packages_added": "已添加 {0} 个包"
 }

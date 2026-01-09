@@ -138,5 +138,7 @@
   "tab_list": "목록",
   "list_back": "목록으로 돌아가기",
   "item_not_registered": "등록되지 않은 항목입니다",
-  "error_invalid_booth_id": "BOOTH ID 혹은 URL을 입력해 주세요"
+  "error_invalid_booth_id": "BOOTH ID 혹은 URL을 입력해 주세요",
+  "error_no_packages": "UnityPackage가 포함되어 있지 않은 항목입니다",
+  "packages_added": "{0}개의 패키지가 추가되었습니다"
 }

@@ -138,5 +138,7 @@
   "tab_list": "リスト",
   "list_back": "リスト一覧に戻る",
   "item_not_registered": "未登録のアイテムです",
-  "error_invalid_booth_id": "BOOTHのIDかURLを入力してください"
+  "error_invalid_booth_id": "BOOTHのIDかURLを入力してください",
+  "error_no_packages": "unitypackageが存在しないアイテムです",
+  "packages_added": "{0}個のパッケージを追加しました"
 }

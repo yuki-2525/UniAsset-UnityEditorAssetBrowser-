@@ -300,20 +300,23 @@ namespace UnityEditorAssetBrowser.Windows
                         var genericData = DragAndDrop.GetGenericData("ImportQueueItem"); // 内部D&D用
                         var databaseItem = DragAndDrop.GetGenericData("ImportQueue_DatabaseItem") as IDatabaseItem; // MainViewからのD&D
 
+                        // データの残留による誤動作を防ぐため、取得後にクリアする
+                        DragAndDrop.SetGenericData("ImportQueueItem", null);
+                        DragAndDrop.SetGenericData("ImportQueue_DatabaseItem", null);
+
                         if (genericData is Models.ImportQueueItem item)
                         {
                             DebugLogger.Log($"Dropped internal item to Import Queue: {item.PackageName}");
                             ImportQueueService.Instance.Add(item.PackagePath, item.PackageName, item.ThumbnailPath, item.Category);
                         }
+                        else if (paths != null && paths.Length > 0)
+                        {
+                            HandleExternalFilesDrop(paths);
+                        }
                         else if (databaseItem != null)
                         {
                             DebugLogger.Log($"Dropped Database Item: {databaseItem.GetTitle()}");
                             AddPackagesFromItem(databaseItem);
-                        }
-                        else if (paths != null && paths.Length > 0)
-                        {
-                            DebugLogger.Log($"Dropped files to Import Queue: {string.Join(", ", paths)}");
-                            HandleExternalFilesDrop(paths);
                         }
                     }
                     break;
@@ -322,7 +325,6 @@ namespace UnityEditorAssetBrowser.Windows
 
         private void HandleExternalFilesDrop(string[] paths)
         {
-            DebugLogger.Log($"HandleExternalFilesDrop: Processing {paths.Length} files.");
             int foundItemsCount = 0;
             int directPackagesCount = 0;
 
@@ -330,14 +332,14 @@ namespace UnityEditorAssetBrowser.Windows
             {
                 if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
                 {
-                    DebugLogger.Log($"Skipping invalid path: {path}");
+                    // DebugLogger.Log($"Skipping invalid path: {path}");
                     continue;
                 }
 
                 // UnityPackageなら直接追加
                 if (path.EndsWith(".unitypackage", System.StringComparison.OrdinalIgnoreCase))
                 {
-                    DebugLogger.Log($"File is UnityPackage: {path}");
+                    // DebugLogger.Log($"File is UnityPackage: {path}");
                     ImportQueueService.Instance.Add(path, System.IO.Path.GetFileName(path), null, "External");
                     directPackagesCount++;
                     continue;
@@ -346,30 +348,24 @@ namespace UnityEditorAssetBrowser.Windows
                 // 画像ファイルならデータベースからアイテムを逆引きして追加
                 if (IsImageFile(path))
                 {
-                    DebugLogger.Log($"File is Image, searching for item: {path}");
-                    var item = FindItemByImagePath(path);
+                    // DebugLogger.Log($"File is Image, searching for item: {path}");
+                    
+                    // パスではなく、ファイル名の一部（UUID等）が一致するかで検索する
+                    var fileNameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(path);
+                    var item = FindItemByImageFileName(fileNameWithoutExt);
+                    
                     if (item != null)
                     {
-                        DebugLogger.Log($"Item found: {item.GetTitle()} ({item.GetItemPath()})");
+                        // DebugLogger.Log($"Item found: {item.GetTitle()} ({item.GetItemPath()})");
                         AddPackagesFromItem(item);
                         foundItemsCount++;
                     }
-                    else
-                    {
-                        DebugLogger.Log($"Item not found for image: {path}");
-                    }
-                }
-                else
-                {
-                    DebugLogger.Log($"Unsupported file type: {path}");
                 }
             }
 
-            if (foundItemsCount == 0 && directPackagesCount == 0)
+            if (foundItemsCount > 0 || directPackagesCount > 0)
             {
-                // 何も追加されなかった場合（画像だがDBに見つからない、または非対応形式）
-                // 必要に応じてメッセージを出すが、D&Dはサイレント失敗も一般的
-                DebugLogger.Log("No items added from dropped files.");
+                DebugLogger.Log($"Added {directPackagesCount} packages and found {foundItemsCount} items from dropped files.");
             }
         }
 
@@ -434,6 +430,45 @@ namespace UnityEditorAssetBrowser.Windows
             return null;
         }
 
+        private IDatabaseItem? FindItemByImageFileName(string namePart)
+        {
+            DebugLogger.Log($"Searching item for image name part: {namePart}");
+
+            bool IsMatch(IDatabaseItem item)
+            {
+                var imgPath = item.GetImagePath();
+                if (string.IsNullOrEmpty(imgPath)) return false;
+                // パスの中にキーワードが含まれているか確認
+                return imgPath.Contains(namePart);
+            }
+
+            // AE Database
+            var aeDb = DatabaseService.GetAEDatabase();
+            if (aeDb != null)
+            {
+                var item = aeDb.Items.FirstOrDefault(IsMatch);
+                if (item != null) return item;
+            }
+
+            // KA Database
+            var kaDb = DatabaseService.GetKADatabase();
+            if (kaDb != null)
+            {
+                var item = kaDb.Items.FirstOrDefault(IsMatch);
+                if (item != null) return item;
+            }
+
+            // BOOTHLM Database
+            var boothlmDb = DatabaseService.GetBOOTHLMDatabase();
+            if (boothlmDb != null)
+            {
+                var item = boothlmDb.Items.FirstOrDefault(IsMatch);
+                if (item != null) return item;
+            }
+
+            return null;
+        }
+
         private string NormalizePath(string path)
         {
             try
@@ -481,16 +516,66 @@ namespace UnityEditorAssetBrowser.Windows
                 addedCount++;
             }
             
-            ShowNotification(new GUIContent($"Added {addedCount} packages."));
+            var msg = LocalizationService.Instance.GetString("packages_added");
+            if (msg != null)
+                ShowNotification(new GUIContent(string.Format(msg, addedCount)));
+            else
+                ShowNotification(new GUIContent($"Added {addedCount} packages."));
         }
 
         /// <summary>
         /// Booth IDまたはURLからパッケージを検索してリストに追加する
         /// </summary>
-        /// <param name="input">Booth ID または 商品ページURL</param>
+        /// <param name="input">Booth ID または 商品ページURL または 画像リンク</param>
         private void AddPackagesFromBoothId(string input)
         {
             if (string.IsNullOrEmpty(input)) return;
+
+            // URL処理: 画像リンクからのファイル名抽出
+            if (input.StartsWith("http://", System.StringComparison.OrdinalIgnoreCase) || 
+                input.StartsWith("https://", System.StringComparison.OrdinalIgnoreCase))
+            {
+                string? searchFileName = null;
+                try
+                {
+                    // asset.localhost 対応
+                    if (input.StartsWith("http://asset.localhost/", System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        string rawPathPart = input.Substring("http://asset.localhost/".Length);
+                        string decoded = System.Uri.UnescapeDataString(rawPathPart);
+                        searchFileName = System.IO.Path.GetFileName(decoded);
+                    }
+                    else if (System.Uri.TryCreate(input, System.UriKind.Absolute, out System.Uri uri))
+                    {
+                        // 通常のURL (booth.pximg.net など)
+                        string path = uri.LocalPath;
+                        searchFileName = System.IO.Path.GetFileName(path);
+                    }
+
+                    if (!string.IsNullOrEmpty(searchFileName) && IsImageFile(searchFileName))
+                    {
+                        var fileNameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(searchFileName);
+                        DebugLogger.Log($"Detected Image URL. FileName: {fileNameWithoutExt}");
+                        
+                        var item = FindItemByImageFileName(fileNameWithoutExt);
+                        if (item != null)
+                        {
+                            AddPackagesFromItem(item);
+                            return;
+                        }
+                        else
+                        {
+                            DebugLogger.Log($"Item not found for image file name: {fileNameWithoutExt}");
+                            ShowNotification(new GUIContent(LocalizationService.Instance.GetString("item_not_registered") ?? "Unregistered item"));
+                            return;
+                        }
+                    }
+                }
+                catch (System.Exception ex)
+                {
+                    DebugLogger.LogError($"URL parsing error: {ex.Message}");
+                }
+            }
 
             int boothId = 0;
             if (int.TryParse(input, out int id))
