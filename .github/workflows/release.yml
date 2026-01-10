@@ -104,6 +104,14 @@ jobs:
         with:
           tag: "${{ env.version }}"
       
+      # Extract Release Notes from CHANGELOG.md
+      - name: Extract Release Notes
+        run: |
+          awk -v ver="[${{ env.version }}]" '/^## \[/ && $2 == ver { flag=1; next } /^## \[/ { flag=0 } flag' ${{ env.packagePath }}/CHANGELOG.md > RELEASE_BODY.md
+          echo "" >> RELEASE_BODY.md
+          echo "過去の更新履歴は [ここ](https://uniasset.sakurayuki.dev/changelog/)から閲覧可能です" >> RELEASE_BODY.md
+          cat RELEASE_BODY.md
+
       # Publish the Release to GitHub
       - name: Make Release
         uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
@@ -112,6 +120,7 @@ jobs:
             ${{ env.zipFile }}
             ${{ env.packagePath }}/package.json
           tag_name: ${{ env.version }}
+          body_path: RELEASE_BODY.md
 
       - name: Generate token
         id: generate_token
