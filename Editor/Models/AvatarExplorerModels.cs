@@ -237,17 +237,17 @@ namespace UnityEditorAssetBrowser.Models
         {
             return itemType switch
             {
-                AvatarExplorerItemType.Avatar => "アバター",
-                AvatarExplorerItemType.Clothing => "衣装",
-                AvatarExplorerItemType.Texture => "テクスチャ",
-                AvatarExplorerItemType.Gimmick => "ギミック",
-                AvatarExplorerItemType.Accessory => "アクセサリー",
-                AvatarExplorerItemType.HairStyle => "髪型",
-                AvatarExplorerItemType.Animation => "アニメーション",
-                AvatarExplorerItemType.Tool => "ツール",
-                AvatarExplorerItemType.Shader => "シェーダー",
+                AvatarExplorerItemType.Avatar => LocalizationService.Instance.GetString("category_avatar"),
+                AvatarExplorerItemType.Clothing => LocalizationService.Instance.GetString("category_clothing"),
+                AvatarExplorerItemType.Texture => LocalizationService.Instance.GetString("category_texture"),
+                AvatarExplorerItemType.Gimmick => LocalizationService.Instance.GetString("category_gimmick"),
+                AvatarExplorerItemType.Accessory => LocalizationService.Instance.GetString("category_accessory"),
+                AvatarExplorerItemType.HairStyle => LocalizationService.Instance.GetString("category_hairstyle"),
+                AvatarExplorerItemType.Animation => LocalizationService.Instance.GetString("category_animation"),
+                AvatarExplorerItemType.Tool => LocalizationService.Instance.GetString("category_tool"),
+                AvatarExplorerItemType.Shader => LocalizationService.Instance.GetString("category_shader"),
                 AvatarExplorerItemType.Custom => CustomCategory,
-                _ => "不明"
+                _ => LocalizationService.Instance.GetString("category_unknown")
             };
         }
     }
