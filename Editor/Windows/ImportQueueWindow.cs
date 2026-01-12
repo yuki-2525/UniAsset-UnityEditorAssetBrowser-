@@ -340,7 +340,7 @@ namespace UnityEditorAssetBrowser.Windows
                 if (path.EndsWith(".unitypackage", System.StringComparison.OrdinalIgnoreCase))
                 {
                     // DebugLogger.Log($"File is UnityPackage: {path}");
-                    ImportQueueService.Instance.Add(path, System.IO.Path.GetFileName(path), null, "External");
+                    ImportQueueService.Instance.Add(path, System.IO.Path.GetFileName(path), string.Empty, "External");
                     directPackagesCount++;
                     continue;
                 }
@@ -552,7 +552,7 @@ namespace UnityEditorAssetBrowser.Windows
                         searchFileName = System.IO.Path.GetFileName(path);
                     }
 
-                    if (!string.IsNullOrEmpty(searchFileName) && IsImageFile(searchFileName))
+                    if (!string.IsNullOrEmpty(searchFileName) && IsImageFile(searchFileName!))
                     {
                         var fileNameWithoutExt = System.IO.Path.GetFileNameWithoutExtension(searchFileName);
                         DebugLogger.Log($"Detected Image URL. FileName: {fileNameWithoutExt}");

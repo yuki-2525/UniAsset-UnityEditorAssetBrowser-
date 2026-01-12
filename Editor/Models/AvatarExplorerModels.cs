@@ -13,6 +13,15 @@ using UnityEditorAssetBrowser.Services;
 
 namespace UnityEditorAssetBrowser.Models
 {
+    /// <summary>
+    /// CommonAvatar.json のエントリを表すモデル
+    /// </summary>
+    public sealed class CommonAvatarDefinition
+    {
+        public string Name { get; set; } = "";
+        public List<string> Avatars { get; set; } = new List<string>();
+    }
+
     #region Database Model
     /// <summary>
     /// AvatarExplorerのデータベースモデル
