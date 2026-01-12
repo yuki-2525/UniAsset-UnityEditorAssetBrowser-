@@ -68,6 +68,9 @@ namespace UnityEditorAssetBrowser.Views
             _assetItemView = assetItemView;
             _assetBrowserViewModel = assetBrowserViewModel;
 
+            // ページ切り替え時にスクロールを先頭へ戻す
+            _paginationViewModel.OnPageChanged += () => { _scrollPosition = Vector2.zero; };
+
             _assetBrowserViewModel.SortMethodChanged += () =>
             {
                 if (_cachedItems == null) return;
@@ -113,16 +116,32 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawTabBar()
         {
+            bool hasListTab = !string.IsNullOrEmpty(DatabaseService.GetBOOTHLMDataPath());
+
+            // 表示用インデックスと実際のタブIDを分離して管理
+            var tabIds = new List<int> { 0, 1, 2, 3 };
             var tabs = new List<string>
             {
-                LocalizationService.Instance.GetString("tab_avatar"), // 0
-                LocalizationService.Instance.GetString("tab_avatar_assets"), // 1
-                LocalizationService.Instance.GetString("tab_world_assets"), // 2
-                LocalizationService.Instance.GetString("tab_others"), // 3
-                _assetBrowserViewModel.CurrentList != null ? _assetBrowserViewModel.CurrentList.Title : LocalizationService.Instance.GetString("tab_list"), // 4
+                LocalizationService.Instance.GetString("tab_avatar"),
+                LocalizationService.Instance.GetString("tab_avatar_assets"),
+                LocalizationService.Instance.GetString("tab_world_assets"),
+                LocalizationService.Instance.GetString("tab_others"),
             };
 
-            var newTab = GUILayout.SelectionGrid(_paginationViewModel.SelectedTab, tabs.ToArray(), tabs.Count, GUIStyleManager.TabButton);
+            if (hasListTab)
+            {
+                tabIds.Add(4);
+                tabs.Add(_assetBrowserViewModel.CurrentList != null
+                    ? _assetBrowserViewModel.CurrentList.Title
+                    : LocalizationService.Instance.GetString("tab_list"));
+            }
+
+            int currentDisplayIndex = tabIds.IndexOf(_paginationViewModel.SelectedTab);
+            if (currentDisplayIndex < 0) currentDisplayIndex = 0; // 不正値は先頭に戻す
+
+            int newDisplayIndex = GUILayout.SelectionGrid(currentDisplayIndex, tabs.ToArray(), tabs.Count, GUIStyleManager.TabButton);
+            int newTab = tabIds[newDisplayIndex];
+
             if (newTab != _paginationViewModel.SelectedTab)
             {
                 DebugLogger.Log($"Tab switched: {_paginationViewModel.SelectedTab} -> {newTab}");

@@ -19,6 +19,9 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <summary>ページネーション情報</summary>
         private readonly PaginationInfo _paginationInfo;
 
+        /// <summary>ページ変更時に通知されるイベント</summary>
+        public event Action? OnPageChanged;
+
         /// <summary>
         /// コンストラクタ
         /// </summary>
@@ -71,7 +74,10 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// ページをリセット（1ページ目に戻す）
         /// </summary>
         public void ResetPage()
-            => _paginationInfo.ResetPage();
+        {
+            _paginationInfo.ResetPage();
+            OnPageChanged?.Invoke();
+        }
 
         /// <summary>
         /// 次のページに移動
@@ -81,7 +87,11 @@ namespace UnityEditorAssetBrowser.ViewModels
         public bool MoveToNextPage(int totalPages)
         {
             bool result = _paginationInfo.MoveToNextPage(totalPages);
-            if (result) DebugLogger.Log($"Moved to next page: {_paginationInfo.CurrentPage}");
+            if (result)
+            {
+                DebugLogger.Log($"Moved to next page: {_paginationInfo.CurrentPage}");
+                OnPageChanged?.Invoke();
+            }
             return result;
         }
 
@@ -92,7 +102,11 @@ namespace UnityEditorAssetBrowser.ViewModels
         public bool MoveToPreviousPage()
         {
             bool result = _paginationInfo.MoveToPreviousPage();
-            if (result) DebugLogger.Log($"Moved to previous page: {_paginationInfo.CurrentPage}");
+            if (result)
+            {
+                DebugLogger.Log($"Moved to previous page: {_paginationInfo.CurrentPage}");
+                OnPageChanged?.Invoke();
+            }
             return result;
         }
 
@@ -105,7 +119,11 @@ namespace UnityEditorAssetBrowser.ViewModels
         public bool MoveToPage(int page, int totalPages)
         {
             bool result = _paginationInfo.MoveToPage(page, totalPages);
-            if (result) DebugLogger.Log($"Moved to page: {page}");
+            if (result)
+            {
+                DebugLogger.Log($"Moved to page: {page}");
+                OnPageChanged?.Invoke();
+            }
             return result;
         }
 

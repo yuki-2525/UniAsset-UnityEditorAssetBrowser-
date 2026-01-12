@@ -375,6 +375,14 @@ namespace UnityEditorAssetBrowser.Views
         {
             int currentTab = _paginationViewModel.SelectedTab;
 
+            // BOOTHLMデータパスが未設定のときはリストタブを無効化してアバタ―タブに戻す
+            bool hasListTab = !string.IsNullOrEmpty(DatabaseService.GetBOOTHLMDataPath());
+            if (!hasListTab && currentTab == 4)
+            {
+                _paginationViewModel.SelectedTab = 0;
+                currentTab = 0;
+            }
+
             // タブが変更された場合
             if (_lastSelectedTab != -1 && _lastSelectedTab != currentTab)
             {
