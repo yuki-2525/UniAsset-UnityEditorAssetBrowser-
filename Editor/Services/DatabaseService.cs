@@ -203,6 +203,14 @@ namespace UnityEditorAssetBrowser.Services
             // データベースをクリア
             ClearBOOTHLMDatabase();
 
+            // BOOTHLMデータパスが存在しない場合は読み込みをスキップ
+            if (string.IsNullOrEmpty(_boothlmDatabasePath) || !Directory.Exists(_boothlmDatabasePath))
+            {
+                DebugLogger.Log($"Skip loading BOOTHLM items because data path is missing: '{_boothlmDatabasePath}'");
+                UpdateViewModels();
+                return;
+            }
+
             // data.dbのパスは固定
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string dbPath = Path.Combine(appDataPath, "pm.booth.library-manager", "data.db");
