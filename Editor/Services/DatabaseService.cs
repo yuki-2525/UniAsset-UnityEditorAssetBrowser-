@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
+using UnityEngine;
 using UnityEditor;
 using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Models;
@@ -34,9 +35,19 @@ namespace UnityEditorAssetBrowser.Services
         private const string KA_DATABASE_PATH_KEY = "UnityEditorAssetBrowser_KADatabasePath";
 
         /// <summary>
+        /// KonoAssetデータパスをpreference.jsonから自動取得するかどうかのEditorPrefsキー
+        /// </summary>
+        private const string KA_USE_PREFS_PATH_KEY = "UnityEditorAssetBrowser_KAUsePrefsPath";
+
+        /// <summary>
         /// BOOTHLMデータベースパスのEditorPrefsキー
         /// </summary>
         private const string BOOTHLM_DATABASE_PATH_KEY = "UnityEditorAssetBrowser_BOOTHLMDatabasePath";
+
+        /// <summary>
+        /// BOOTHLMデータパスをpreferences(data.db)から自動取得するかどうかのEditorPrefsキー
+        /// </summary>
+        private const string BOOTHLM_USE_PREFS_PATH_KEY = "UnityEditorAssetBrowser_BOOTHLMUsePrefsPath";
 
         /// <summary>
         /// AvatarExplorerデータベースのパス
@@ -49,9 +60,19 @@ namespace UnityEditorAssetBrowser.Services
         private static string _kaDatabasePath = "";
 
         /// <summary>
+        /// preference.jsonから自動取得するかどうか
+        /// </summary>
+        private static bool _kaUsePrefsPath;
+
+        /// <summary>
         /// BOOTHLMデータベースのパス（データ保存先）
         /// </summary>
         private static string _boothlmDatabasePath = "";
+
+        /// <summary>
+        /// data.dbのpreferencesから自動取得するかどうか
+        /// </summary>
+        private static bool _boothlmUsePrefsPath;
 
         /// <summary>
         /// AvatarExplorerのデータベース
@@ -83,6 +104,19 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         private static BOOTHLMDatabase? _boothlmDatabase;
 
+        [Serializable]
+        private class KAPreferenceRoot
+        {
+            public int version;
+            public KAPreferenceData? data;
+        }
+
+        [Serializable]
+        private class KAPreferenceData
+        {
+            public string? dataDirPath;
+        }
+
         private static AssetBrowserViewModel? _assetBrowserViewModel;
         private static SearchViewModel? _searchViewModel;
         private static PaginationViewModel? _paginationViewModel;
@@ -112,6 +146,24 @@ namespace UnityEditorAssetBrowser.Services
             _kaDatabasePath = EditorPrefs.GetString(KA_DATABASE_PATH_KEY, "");
             _boothlmDatabasePath = EditorPrefs.GetString(BOOTHLM_DATABASE_PATH_KEY, "");
 
+            var kaPrefPath = GetKAPreferenceFilePath();
+            var kaPrefExists = File.Exists(kaPrefPath);
+            _kaUsePrefsPath = EditorPrefs.GetBool(KA_USE_PREFS_PATH_KEY, kaPrefExists);
+
+            var boothlmDbFilePath = GetDefaultBOOTHLMDbFilePath();
+            var boothlmDbExists = File.Exists(boothlmDbFilePath);
+            _boothlmUsePrefsPath = EditorPrefs.GetBool(BOOTHLM_USE_PREFS_PATH_KEY, boothlmDbExists);
+
+            if (_kaUsePrefsPath)
+            {
+                RefreshKADatabasePathFromPreference();
+            }
+
+            if (_boothlmUsePrefsPath)
+            {
+                RefreshBOOTHLMDataPathFromPreferences();
+            }
+
             DebugLogger.Log($"AE Path: {_aeDatabasePath}");
             DebugLogger.Log($"KA Path: {_kaDatabasePath}");
             DebugLogger.Log($"BOOTHLM Path: {_boothlmDatabasePath}");
@@ -130,6 +182,8 @@ namespace UnityEditorAssetBrowser.Services
             EditorPrefs.SetString(AE_DATABASE_PATH_KEY, _aeDatabasePath);
             EditorPrefs.SetString(KA_DATABASE_PATH_KEY, _kaDatabasePath);
             EditorPrefs.SetString(BOOTHLM_DATABASE_PATH_KEY, _boothlmDatabasePath);
+            EditorPrefs.SetBool(KA_USE_PREFS_PATH_KEY, _kaUsePrefsPath);
+            EditorPrefs.SetBool(BOOTHLM_USE_PREFS_PATH_KEY, _boothlmUsePrefsPath);
         }
 
         /// <summary>
@@ -203,6 +257,12 @@ namespace UnityEditorAssetBrowser.Services
             // データベースをクリア
             ClearBOOTHLMDatabase();
 
+            // 自動取得が有効なら毎回最新のpreferencesを読む
+            if (_boothlmUsePrefsPath)
+            {
+                RefreshBOOTHLMDataPathFromPreferences();
+            }
+
             // BOOTHLMデータパスが存在しない場合は読み込みをスキップ
             if (string.IsNullOrEmpty(_boothlmDatabasePath) || !Directory.Exists(_boothlmDatabasePath))
             {
@@ -212,8 +272,7 @@ namespace UnityEditorAssetBrowser.Services
             }
 
             // data.dbのパスは固定
-            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string dbPath = Path.Combine(appDataPath, "pm.booth.library-manager", "data.db");
+            string dbPath = GetDefaultBOOTHLMDbFilePath();
             DebugLogger.Log($"LoadBOOTHLMDatabase path: {dbPath}");
 
             if (File.Exists(dbPath))
@@ -292,6 +351,8 @@ namespace UnityEditorAssetBrowser.Services
         public static void OnKADatabasePathChanged(string path)
         {
             SetKADatabasePath(path);
+            _kaUsePrefsPath = false;
+            EditorPrefs.SetBool(KA_USE_PREFS_PATH_KEY, false);
 
             if (string.IsNullOrEmpty(path))
             {
@@ -319,6 +380,8 @@ namespace UnityEditorAssetBrowser.Services
         public static void OnBOOTHLMDatabasePathChanged(string path)
         {
             SetBOOTHLMDatabasePath(path);
+            _boothlmUsePrefsPath = false;
+            EditorPrefs.SetBool(BOOTHLM_USE_PREFS_PATH_KEY, false);
             
             // パスが変わってもDBの再読み込みは不要（DBパスは固定だから）
             // ただし、GetItemPathの結果が変わるため、ビューの更新は必要
@@ -353,6 +416,122 @@ namespace UnityEditorAssetBrowser.Services
         /// <returns>データベースのパス</returns>
         public static string GetBOOTHLMDataPath()
             => _boothlmDatabasePath;
+
+        /// <summary>
+        /// BOOTHLM data.dbの標準配置パスを取得する
+        /// </summary>
+        public static string GetDefaultBOOTHLMDbFilePath()
+        {
+            string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            return Path.Combine(appDataPath, "pm.booth.library-manager", "data.db");
+        }
+
+        /// <summary>
+        /// KonoAsset preference.json の標準パスを取得する
+        /// </summary>
+        public static string GetKAPreferenceFilePath()
+        {
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            return Path.Combine(localAppData, "dev.konoasset.app", "preference.json");
+        }
+
+        /// <summary>
+        /// preference.jsonからKonoAssetデータ保存先を読み取り反映する
+        /// </summary>
+        public static void RefreshKADatabasePathFromPreference()
+        {
+            var prefPath = GetKAPreferenceFilePath();
+            if (!File.Exists(prefPath))
+            {
+                SetKADatabasePath("");
+                return;
+            }
+
+            try
+            {
+                var json = File.ReadAllText(prefPath);
+                var pref = JsonUtility.FromJson<KAPreferenceRoot>(json);
+                var detected = pref?.data?.dataDirPath;
+                if (!string.IsNullOrEmpty(detected))
+                {
+                    SetKADatabasePath(detected!);
+                }
+                else
+                {
+                    SetKADatabasePath("");
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogError($"Failed to read KA preference: {ex.Message}");
+                SetKADatabasePath("");
+            }
+        }
+
+        public static bool IsKAPreferencesAutoLoadEnabled()
+            => _kaUsePrefsPath;
+
+        public static void SetKAPreferencesAutoLoadEnabled(bool enabled)
+        {
+            _kaUsePrefsPath = enabled;
+            EditorPrefs.SetBool(KA_USE_PREFS_PATH_KEY, enabled);
+
+            if (enabled)
+            {
+                RefreshKADatabasePathFromPreference();
+                LoadKADatabase();
+            }
+            else
+            {
+                SetKADatabasePath("");
+                ClearKADatabase();
+                UpdateViewModels();
+            }
+
+            SaveSettings();
+            OnPathChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// preferences(data.db)からBOOTHLMデータ保存先を読み取り反映する
+        /// </summary>
+        public static void RefreshBOOTHLMDataPathFromPreferences()
+        {
+            var dbPath = GetDefaultBOOTHLMDbFilePath();
+            var detected = BOOTHLMDatabaseHelper.GetItemDirectoryPathFromPreferences(dbPath);
+            if (!string.IsNullOrEmpty(detected))
+            {
+                SetBOOTHLMDatabasePath(detected!);
+            }
+            else
+            {
+                SetBOOTHLMDatabasePath("");
+            }
+        }
+
+        public static bool IsBOOTHLMPreferencesAutoLoadEnabled()
+            => _boothlmUsePrefsPath;
+
+        public static void SetBOOTHLMPreferencesAutoLoadEnabled(bool enabled)
+        {
+            _boothlmUsePrefsPath = enabled;
+            EditorPrefs.SetBool(BOOTHLM_USE_PREFS_PATH_KEY, enabled);
+
+            if (enabled)
+            {
+                RefreshBOOTHLMDataPathFromPreferences();
+                LoadBOOTHLMDatabase();
+            }
+            else
+            {
+                SetBOOTHLMDatabasePath("");
+                ClearBOOTHLMDatabase();
+                UpdateViewModels();
+            }
+
+            SaveSettings();
+            OnPathChanged?.Invoke();
+        }
 
         /// <summary>
         /// AvatarExplorerデータベースのパスを設定する

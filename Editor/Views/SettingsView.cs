@@ -323,17 +323,33 @@ namespace UnityEditorAssetBrowser.Views
                     _onAEDatabasePathChanged
                 );
 
-                DrawDatabasePathField(
-                    "KA Database Path:",
-                    DatabaseService.GetKADatabasePath(),
-                    _onKADatabasePathChanged
+                bool kaAutoLoad = DatabaseService.IsKAPreferencesAutoLoadEnabled();
+                bool newKaAutoLoad = EditorGUILayout.ToggleLeft(
+                    "KonoAsset",
+                    kaAutoLoad,
+                    GUIStyleManager.Label
                 );
 
-                DrawDatabasePathField(
-                    "BOOTHLM Data Path:",
-                    DatabaseService.GetBOOTHLMDataPath(),
-                    _onBOOTHLMDataPathChanged
+                if (newKaAutoLoad != kaAutoLoad)
+                {
+                    DatabaseService.SetKAPreferencesAutoLoadEnabled(newKaAutoLoad);
+                    InitializeSettingsVisibility();
+                    _showDatabaseSettings = true;
+                }
+
+                bool boothlmAutoLoad = DatabaseService.IsBOOTHLMPreferencesAutoLoadEnabled();
+                bool newBoothlmAutoLoad = EditorGUILayout.ToggleLeft(
+                    "BOOTH Library Manager",
+                    boothlmAutoLoad,
+                    GUIStyleManager.Label
                 );
+
+                if (newBoothlmAutoLoad != boothlmAutoLoad)
+                {
+                    DatabaseService.SetBOOTHLMPreferencesAutoLoadEnabled(newBoothlmAutoLoad);
+                    InitializeSettingsVisibility();
+                    _showDatabaseSettings = true;
+                }
 
                 EditorGUILayout.EndVertical();
             }
@@ -792,7 +808,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="label">フィールドのラベル</param>
         /// <param name="path">現在のパス</param>
         /// <param name="onPathChanged">パスが変更された時のコールバック</param>
-        private void DrawDatabasePathField(string label, string path, Action<string> onPathChanged)
+        private void DrawDatabasePathField(string label, string path, Action<string> onPathChanged, bool allowEdit = true)
         {
             EditorGUILayout.BeginHorizontal();
             EditorGUILayout.LabelField(label, GUIStyleManager.Label, GUILayout.Width(140));
@@ -803,6 +819,7 @@ namespace UnityEditorAssetBrowser.Views
             EditorGUI.EndDisabledGroup();
 
             // 削除ボタン
+            EditorGUI.BeginDisabledGroup(!allowEdit);
             if (!string.IsNullOrEmpty(path) && GUILayout.Button(LocalizationService.Instance.GetString("remove"), GUIStyleManager.Button, GUILayout.Width(60)))
             {
                 onPathChanged("");
@@ -824,6 +841,7 @@ namespace UnityEditorAssetBrowser.Views
                     if (label == "AE Database Path:" || label == "BOOTHLM Data Path:") InitializeCategoryAssetTypes();
                 }
             }
+            EditorGUI.EndDisabledGroup();
 
             EditorGUILayout.EndHorizontal();
         }

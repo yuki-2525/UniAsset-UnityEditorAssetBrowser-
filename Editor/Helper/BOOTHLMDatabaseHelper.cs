@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using SQLite4Unity3d;
 using UnityEditorAssetBrowser.Models;
 using UnityEngine;
@@ -50,6 +51,11 @@ namespace UnityEditorAssetBrowser.Helper
             public int? category_id { get; set; }
             public int? subcategory_id { get; set; }
             public string? age_restriction { get; set; }
+        }
+
+        private class PreferenceBlobResult
+        {
+            public byte[]? value { get; set; }
         }
 
         // キャッシュ
@@ -138,6 +144,45 @@ namespace UnityEditorAssetBrowser.Helper
                 }
                 return null;
             }
+        }
+
+        /// <summary>
+        /// preferencesテーブルのitem_directory_pathからデータ保存先パスを取得する
+        /// </summary>
+        /// <param name="dbPath">data.dbへのフルパス</param>
+        /// <returns>パス。取得できない場合はnull</returns>
+        public static string? GetItemDirectoryPathFromPreferences(string dbPath)
+        {
+            try
+            {
+                if (!File.Exists(dbPath)) return null;
+
+                using (var connection = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly))
+                {
+                    // まずBLOB（カラム型BLOB想定）で取得を試す
+                    var blob = connection.Query<PreferenceBlobResult>("SELECT item_directory_path AS value FROM preferences LIMIT 1").FirstOrDefault();
+                    var path = DecodePath(blob?.value);
+
+                    // 別形式（key/valueスタイルのBLOB）も試す
+                    if (string.IsNullOrEmpty(path))
+                    {
+                        blob = connection.Query<PreferenceBlobResult>("SELECT value FROM preferences WHERE key = 'item_directory_path' LIMIT 1").FirstOrDefault();
+                        path = DecodePath(blob?.value);
+                    }
+
+                    if (!string.IsNullOrEmpty(path))
+                    {
+                        DebugLogger.Log($"Detected BOOTHLM data path from preferences: {path}");
+                        return path;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogError($"Failed to read item_directory_path from preferences: {ex.Message}");
+            }
+
+            return null;
         }
 
         private class RegisteredIdResult
@@ -411,6 +456,39 @@ namespace UnityEditorAssetBrowser.Helper
             if (DateTime.TryParse(dateStr, out DateTime result))
                 return result;
             return DateTime.MinValue;
+        }
+
+        private static string? DecodePath(byte[]? data)
+        {
+            if (data == null || data.Length == 0) return null;
+
+            // UTF-16LE（Windows BLOB想定）を最優先で解釈する
+            if (data.Length % 2 == 0)
+            {
+                var unicode = Encoding.Unicode.GetString(data).Trim('\0');
+                if (IsLikelyPath(unicode)) return NormalizePath(unicode);
+            }
+
+            return null;
+        }
+
+        private static bool IsLikelyPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            // ルート付きかつパス記号を含む場合に限定して採用
+            return Path.IsPathRooted(path) || path.Contains(Path.DirectorySeparatorChar) || path.Contains(Path.AltDirectorySeparatorChar);
+        }
+
+        private static string NormalizePath(string path)
+        {
+            try
+            {
+                return Path.GetFullPath(path.Trim());
+            }
+            catch
+            {
+                return path.Trim();
+            }
         }
     }
 }
