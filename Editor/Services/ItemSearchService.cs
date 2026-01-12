@@ -65,35 +65,45 @@ namespace UnityEditorAssetBrowser.Services
         {
             foreach (var keyword in keywords)
             {
+                bool isExclusion = keyword.StartsWith("-") && keyword.Length > 1;
+                string searchKeyword = isExclusion ? keyword.Substring(1) : keyword;
+                
                 bool matchesKeyword = false;
 
                 // タイトル
-                if (item.GetTitle().Contains(keyword, StringComparison.InvariantCultureIgnoreCase))
+                if (item.GetTitle().Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase))
                     matchesKeyword = true;
 
                 // 作者名
-                if (item.GetAuthor().Contains(keyword, StringComparison.InvariantCultureIgnoreCase))
+                if (!matchesKeyword && item.GetAuthor().Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase))
                     matchesKeyword = true;
 
                 // カテゴリ（アバタータブはスキップ）
-                if (tabIndex != 0 && IsCategoryMatch(item, keyword))
+                if (!matchesKeyword && tabIndex != 0 && IsCategoryMatch(item, searchKeyword))
                     matchesKeyword = true;
 
                 // 対応アバター（アイテムタブのみ判定）
-                if (tabIndex == 1 && IsSupportedAvatarsMatch(item, keyword))
+                if (!matchesKeyword && tabIndex == 1 && IsSupportedAvatarsMatch(item, searchKeyword))
                     matchesKeyword = true;
 
                 // タグ
-                if (IsTagsMatch(item, keyword))
+                if (!matchesKeyword && IsTagsMatch(item, searchKeyword))
                     matchesKeyword = true;
 
                 // メモ
-                if (IsMemoMatch(item, keyword))
+                if (!matchesKeyword && IsMemoMatch(item, searchKeyword))
                     matchesKeyword = true;
 
-                // このキーワードで1つも一致しなかったらfalse
-                if (!matchesKeyword)
-                    return false;
+                if (isExclusion)
+                {
+                   // 除外キーワードの場合：一致したら除外（falseを返す）
+                   if (matchesKeyword) return false;
+                }
+                else
+                {
+                   // 通常キーワードの場合：一致しなかったら除外（falseを返す）
+                   if (!matchesKeyword) return false;
+                }
             }
 
             return true;
@@ -144,7 +154,23 @@ namespace UnityEditorAssetBrowser.Services
         {
             string itemTitle = item.GetTitle();
 
-            return keywords.All(keyword => itemTitle.Contains(keyword, StringComparison.InvariantCultureIgnoreCase));
+            foreach (var keyword in keywords)
+            {
+                bool isExclusion = keyword.StartsWith("-") && keyword.Length > 1;
+                string searchKeyword = isExclusion ? keyword.Substring(1) : keyword;
+                
+                bool match = itemTitle.Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase);
+                
+                if (isExclusion)
+                {
+                    if (match) return false;
+                }
+                else
+                {
+                    if (!match) return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -157,7 +183,23 @@ namespace UnityEditorAssetBrowser.Services
         {
             string authorName = item.GetAuthor();
 
-            return keywords.All(keyword => authorName.Contains(keyword, StringComparison.InvariantCultureIgnoreCase));
+            foreach (var keyword in keywords)
+            {
+                bool isExclusion = keyword.StartsWith("-") && keyword.Length > 1;
+                string searchKeyword = isExclusion ? keyword.Substring(1) : keyword;
+                
+                bool match = authorName.Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase);
+                
+                if (isExclusion)
+                {
+                    if (match) return false;
+                }
+                else
+                {
+                    if (!match) return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -170,7 +212,23 @@ namespace UnityEditorAssetBrowser.Services
         {
             string categoryName = item.GetCategory();
 
-            return keywords.All(keyword => categoryName.Contains(keyword, StringComparison.InvariantCultureIgnoreCase));
+            foreach (var keyword in keywords)
+            {
+                bool isExclusion = keyword.StartsWith("-") && keyword.Length > 1;
+                string searchKeyword = isExclusion ? keyword.Substring(1) : keyword;
+                
+                bool match = categoryName.Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase);
+                
+                if (isExclusion)
+                {
+                    if (match) return false;
+                }
+                else
+                {
+                    if (!match) return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -196,12 +254,23 @@ namespace UnityEditorAssetBrowser.Services
         {
             var supportedAvatars = item.GetSupportedAvatars();
 
-            // すべてのキーワードが少なくとも1つの対応アバターに含まれていることを確認
-            return keywords.All(keyword =>
-                supportedAvatars.Any(avatar =>
-                    avatar.Contains(keyword, StringComparison.InvariantCultureIgnoreCase)
-                )
-            );
+            foreach (var keyword in keywords)
+            {
+                bool isExclusion = keyword.StartsWith("-") && keyword.Length > 1;
+                string searchKeyword = isExclusion ? keyword.Substring(1) : keyword;
+                
+                bool match = supportedAvatars.Any(avatar => avatar.Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase));
+                
+                if (isExclusion)
+                {
+                    if (match) return false;
+                }
+                else
+                {
+                    if (!match) return false;
+                }
+            }
+            return true;
         }
         
         /// <summary>
@@ -227,10 +296,28 @@ namespace UnityEditorAssetBrowser.Services
         private bool IsTagsMatch(IDatabaseItem item, string[] keywords)
         {
             string[] tags = item.GetTags();
-            if (tags.Length == 0) return false;
 
-            // すべてのキーワードが少なくとも1つのタグに含まれていることを確認
-            return keywords.All(keyword => tags.Any(tag => tag.Contains(keyword, StringComparison.InvariantCultureIgnoreCase)));
+            foreach (var keyword in keywords)
+            {
+                bool isExclusion = keyword.StartsWith("-") && keyword.Length > 1;
+                string searchKeyword = isExclusion ? keyword.Substring(1) : keyword;
+                
+                bool match = false;
+                if (tags.Length > 0)
+                {
+                    match = tags.Any(tag => tag.Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase));
+                }
+                
+                if (isExclusion)
+                {
+                    if (match) return false;
+                }
+                else
+                {
+                    if (!match) return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
@@ -257,10 +344,28 @@ namespace UnityEditorAssetBrowser.Services
         private bool IsMemoMatch(IDatabaseItem item, string[] keywords)
         {
             string memo = item.GetMemo();
-            if (string.IsNullOrEmpty(memo)) return false;
+            
+            foreach (var keyword in keywords)
+            {
+                bool isExclusion = keyword.StartsWith("-") && keyword.Length > 1;
+                string searchKeyword = isExclusion ? keyword.Substring(1) : keyword;
+                
+                bool match = false;
+                if (!string.IsNullOrEmpty(memo))
+                {
+                    match = memo.Contains(searchKeyword, StringComparison.InvariantCultureIgnoreCase);
+                }
 
-            // すべてのキーワードがメモに含まれていることを確認
-            return keywords.All(keyword => memo.Contains(keyword, StringComparison.InvariantCultureIgnoreCase));
+                if (isExclusion)
+                {
+                    if (match) return false;
+                }
+                else
+                {
+                    if (!match) return false;
+                }
+            }
+            return true;
         }
 
         /// <summary>
