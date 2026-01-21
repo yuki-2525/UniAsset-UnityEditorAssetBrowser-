@@ -19,6 +19,10 @@ namespace UnityEditorAssetBrowser.Models
     public sealed class CommonAvatarDefinition
     {
         public string Name { get; set; } = "";
+
+        [JsonProperty("GroupName")]
+        private string GroupName { set { Name = value; } }
+
         public List<string> Avatars { get; set; } = new List<string>();
     }
 
@@ -125,6 +129,9 @@ namespace UnityEditorAssetBrowser.Models
         /// </summary>
         public string AuthorName { get; set; } = "";
 
+        [JsonProperty("Author")]
+        private string AuthorV2 { set { AuthorName = value; } }
+
         /// <summary>
         /// アイテムのメモ
         /// </summary>
@@ -140,6 +147,9 @@ namespace UnityEditorAssetBrowser.Models
         /// </summary>
         public string ImagePath { get; set; } = "";
 
+        [JsonProperty("ThumbnmailFileName")]
+        private string ImagePathV2 { set { ImagePath = value; } }
+
         /// <summary>
         /// マテリアルのパス
         /// </summary>
@@ -149,6 +159,9 @@ namespace UnityEditorAssetBrowser.Models
         /// 対応アバターのリスト
         /// </summary>
         public string[] SupportedAvatar { get; set; } = Array.Empty<string>();
+
+        [JsonProperty("SupportedAvatars")]
+        private string[] SupportedAvatarsV2 { set { SupportedAvatar = value; } }
 
         /// <summary>
         /// BOOTHのID
@@ -198,6 +211,16 @@ namespace UnityEditorAssetBrowser.Models
             => ItemMemo;
         public string GetItemPath()
         {
+            if (ItemPath.StartsWith("<sys>"))
+            {
+                var root = DatabaseService.GetAEDataRootPath();
+                if (!string.IsNullOrEmpty(root))
+                {
+                    // <sys>で始まっていないものはフルパスと認識する
+                    return Path.GetFullPath(Path.Combine(root, ItemPath.Replace("<sys>", "")));
+                }
+            }
+
             if (ItemPath.StartsWith("Datas\\"))
             {
                 return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ItemPath.Replace("Datas\\", "")));
@@ -206,7 +229,15 @@ namespace UnityEditorAssetBrowser.Models
             return Path.GetFullPath(ItemPath);
         }
         public string GetImagePath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ImagePath.Replace("Datas\\", "")));
+        {
+            if (DatabaseService.IsAEv2PreferencesAutoLoadEnabled())
+            {
+                var thumbnailDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Avatar Explorer V2", "images", "item_thumbnails");
+                return Path.GetFullPath(Path.Combine(thumbnailDir, ImagePath));
+            }
+
+            return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ImagePath.Replace("Datas\\", "")));
+        }
         public string[] GetSupportedAvatars()
             => SupportedAvatar;
         public int GetBoothId()

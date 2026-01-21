@@ -30,6 +30,11 @@ namespace UnityEditorAssetBrowser.Services
         private const string AE_DATABASE_PATH_KEY = "UnityEditorAssetBrowser_AEDatabasePath";
 
         /// <summary>
+        /// AvatarExplorer V2のデータ保存先を自動検出するかどうかのEditorPrefsキー
+        /// </summary>
+        private const string AES_V2_USE_PREFS_PATH_KEY = "UnityEditorAssetBrowser_AEV2UsePrefsPath";
+
+        /// <summary>
         /// KonoAssetデータベースパスのEditorPrefsキー
         /// </summary>
         private const string KA_DATABASE_PATH_KEY = "UnityEditorAssetBrowser_KADatabasePath";
@@ -53,6 +58,16 @@ namespace UnityEditorAssetBrowser.Services
         /// AvatarExplorerデータベースのパス
         /// </summary>
         private static string _aeDatabasePath = "";
+
+        /// <summary>
+        /// AvatarExplorerのデータルートパス（V2互換用）
+        /// </summary>
+        private static string _aeDataRootPath = "";
+
+        /// <summary>
+        /// AEv2のruntimeSettingsからから自動取得するかどうか
+        /// </summary>
+        private static bool _aeV2UsePrefsPath;
 
         /// <summary>
         /// KonoAssetデータベースのパス
@@ -146,6 +161,10 @@ namespace UnityEditorAssetBrowser.Services
             _kaDatabasePath = EditorPrefs.GetString(KA_DATABASE_PATH_KEY, "");
             _boothlmDatabasePath = EditorPrefs.GetString(BOOTHLM_DATABASE_PATH_KEY, "");
 
+            var aeDefaultPath = GetDefaultAEv2DatabasePath();
+            var aeDefaultExists = File.Exists(aeDefaultPath);
+            _aeV2UsePrefsPath = EditorPrefs.GetBool(AES_V2_USE_PREFS_PATH_KEY, false); // Default to false to preserve V1 behavior unless configured
+
             var kaPrefPath = GetKAPreferenceFilePath();
             var kaPrefExists = File.Exists(kaPrefPath);
             _kaUsePrefsPath = EditorPrefs.GetBool(KA_USE_PREFS_PATH_KEY, kaPrefExists);
@@ -153,6 +172,11 @@ namespace UnityEditorAssetBrowser.Services
             var boothlmDbFilePath = GetDefaultBOOTHLMDbFilePath();
             var boothlmDbExists = File.Exists(boothlmDbFilePath);
             _boothlmUsePrefsPath = EditorPrefs.GetBool(BOOTHLM_USE_PREFS_PATH_KEY, boothlmDbExists);
+
+            if (_aeV2UsePrefsPath)
+            {
+                RefreshAEv2PathsFromSettings();
+            }
 
             if (_kaUsePrefsPath)
             {
@@ -182,6 +206,7 @@ namespace UnityEditorAssetBrowser.Services
             EditorPrefs.SetString(AE_DATABASE_PATH_KEY, _aeDatabasePath);
             EditorPrefs.SetString(KA_DATABASE_PATH_KEY, _kaDatabasePath);
             EditorPrefs.SetString(BOOTHLM_DATABASE_PATH_KEY, _boothlmDatabasePath);
+            EditorPrefs.SetBool(AES_V2_USE_PREFS_PATH_KEY, _aeV2UsePrefsPath);
             EditorPrefs.SetBool(KA_USE_PREFS_PATH_KEY, _kaUsePrefsPath);
             EditorPrefs.SetBool(BOOTHLM_USE_PREFS_PATH_KEY, _boothlmUsePrefsPath);
         }
@@ -316,6 +341,8 @@ namespace UnityEditorAssetBrowser.Services
         public static void OnAEDatabasePathChanged(string path)
         {
             SetAEDatabasePath(path);
+            _aeV2UsePrefsPath = false;
+            EditorPrefs.SetBool(AES_V2_USE_PREFS_PATH_KEY, false);
 
             if (string.IsNullOrEmpty(path))
             {
@@ -402,6 +429,16 @@ namespace UnityEditorAssetBrowser.Services
             if (!_aeDatabasePath.EndsWith("Datas")) return Path.GetFullPath(Path.Combine(_aeDatabasePath, "Datas"));
             return Path.GetFullPath(_aeDatabasePath);
         }
+
+        /// <summary>
+        /// AvatarExplorerのデータルートパスを取得する
+        /// </summary>
+        public static string GetAEDataRootPath() => _aeDataRootPath;
+
+        /// <summary>
+        /// AvatarExplorerのデータルートパスを設定する
+        /// </summary>
+        public static void SetAEDataRootPath(string path) => _aeDataRootPath = path;
 
         /// <summary>
         /// KonoAssetデータベースのパスを取得する
@@ -531,6 +568,80 @@ namespace UnityEditorAssetBrowser.Services
 
             SaveSettings();
             OnPathChanged?.Invoke();
+        }
+
+        public static string GetDefaultAEv2DatabasePath()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Avatar Explorer V2", "database");
+        }
+
+        public static string GetAEv2SettingsFilePath()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Avatar Explorer V2", "settings", "runtimeSettings.json");
+        }
+
+        public static void RefreshAEv2PathsFromSettings()
+        {
+            var dbDirPath = GetDefaultAEv2DatabasePath();
+            var dbFilePath = Path.Combine(dbDirPath, "items.json");
+
+            if (File.Exists(dbFilePath))
+            {
+                SetAEDatabasePath(dbDirPath);
+            
+                var settingsPath = GetAEv2SettingsFilePath();
+                if (File.Exists(settingsPath))
+                {
+                    try
+                    {
+                        var json = File.ReadAllText(settingsPath);
+                        var settings = JsonUtility.FromJson<AERuntimeSettings>(json);
+                        if (!string.IsNullOrEmpty(settings?.DataRootDirectory))
+                        {
+                            SetAEDataRootPath(settings.DataRootDirectory);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.LogWarning($"Failed to load AEv2 runtime settings: {ex.Message}");
+                    }
+                }
+            }
+            else
+            {
+                SetAEDatabasePath("");
+                SetAEDataRootPath("");
+            }
+        }
+
+        public static bool IsAEv2PreferencesAutoLoadEnabled() => _aeV2UsePrefsPath;
+
+        public static void SetAEv2PreferencesAutoLoadEnabled(bool enabled)
+        {
+            _aeV2UsePrefsPath = enabled;
+            EditorPrefs.SetBool(AES_V2_USE_PREFS_PATH_KEY, enabled);
+
+            if (enabled)
+            {
+                RefreshAEv2PathsFromSettings();
+                LoadAEDatabase();
+            }
+            else
+            {
+                SetAEDatabasePath("");
+                SetAEDataRootPath(""); // Clear root path too
+                ClearAEDatabase();
+                UpdateViewModels();
+            }
+
+            SaveSettings();
+            OnPathChanged?.Invoke();
+        }
+
+        [Serializable]
+        private class AERuntimeSettings
+        {
+            public string DataRootDirectory = "";
         }
 
         /// <summary>
