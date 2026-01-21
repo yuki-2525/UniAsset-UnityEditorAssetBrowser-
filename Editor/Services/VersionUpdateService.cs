@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -12,6 +12,7 @@ using Newtonsoft.Json.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -348,25 +349,26 @@ namespace UnityEditorAssetBrowser.Services
         {
             // package.jsonからdisplayNameを取得
             var displayName = GetCurrentDisplayName();
-            if (string.IsNullOrEmpty(displayName)) displayName = "このパッケージ";
+            if (string.IsNullOrEmpty(displayName)) displayName = LocalizationService.Instance.GetString("default_package_name");
 
-            var message =
-                $"\"{displayName}\"はアップデート可能です！\n\n" +
-                $"現在のバージョン: {currentVersion}\n" +
-                $"最新バージョン: {remoteInfo.version}\n\n" +
-                $"VCCよりアップデートしてください";
+            var message = string.Format(
+                LocalizationService.Instance.GetString("update_available_message"),
+                displayName,
+                currentVersion,
+                remoteInfo.version
+            );
 
             // ウィンドウタイトルにもdisplayNameを含める
-            var windowTitle = string.IsNullOrEmpty(displayName) || displayName == "このパッケージ"
-                ? "アップデート通知"
-                : $"{displayName} アップデート通知";
+            var windowTitle = string.IsNullOrEmpty(displayName) || displayName == LocalizationService.Instance.GetString("default_package_name")
+                ? LocalizationService.Instance.GetString("update_available_title")
+                : string.Format(LocalizationService.Instance.GetString("update_available_title_format"), displayName);
 
             var result = EditorUtility.DisplayDialogComplex(
                 windowTitle,
                 message,
-                "詳細を確認",
-                "後で通知",
-                "このバージョンを無視"
+                LocalizationService.Instance.GetString("update_dialog_details"),
+                LocalizationService.Instance.GetString("update_dialog_later"),
+                LocalizationService.Instance.GetString("update_dialog_ignore")
             );
 
             switch (result)
@@ -439,13 +441,18 @@ namespace UnityEditorAssetBrowser.Services
                 try
                 {
                     var jsonData = request.downloadHandler.text;
+                    DebugLogger.Log($"Version check response received: {jsonData}");
                     var remoteInfo = ParseRemoteVersionInfo(jsonData);
                     if (remoteInfo != null) HandleVersionInfo(currentVersion, remoteInfo);
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    // Ignored
+                    DebugLogger.LogError($"Version check process failed: {ex.Message}");
                 }
+            }
+            else
+            {
+                DebugLogger.LogWarning($"Version check failed: {request.error}");
             }
         }
 
@@ -573,9 +580,14 @@ namespace UnityEditorAssetBrowser.Services
                 var timeSinceLastCheck = DateTime.Now - lastCheckDate;
 
                 // 24時間以内にチェック済みの場合はスキップ
-                if (timeSinceLastCheck < TimeSpan.FromHours(VERSION_CHECK_INTERVAL_HOURS)) return;
+                if (timeSinceLastCheck < TimeSpan.FromHours(VERSION_CHECK_INTERVAL_HOURS))
+                {
+                    DebugLogger.Log("Skipping version check (checked within 24 hours).");
+                    return;
+                }
             }
             
+            DebugLogger.Log("Checking for updates...");
             // バージョンチェックを実行
             FetchRemoteVersion();
         }

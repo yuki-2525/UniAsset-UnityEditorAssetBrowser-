@@ -5,6 +5,9 @@ on:
   push:
     branches: "main"
 
+permissions:
+  contents: write
+
 jobs:
 
   # Validate Repository Configuration
@@ -66,8 +69,6 @@ jobs:
   build:
     needs: GetTargetVersion
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     env:
       packagePath: .
     if: always() && (needs.GetTargetVersion.outputs.TagExist == 'false')
@@ -112,10 +113,19 @@ jobs:
             ${{ env.packagePath }}/package.json
           tag_name: ${{ env.version }}
 
+      - name: Generate token
+        id: generate_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: yuki-2525
+          repositories: vpm_sakurayuki_dev
+
       - name: Update Website
         uses: peter-evans/repository-dispatch@v3
         with:
-          token: ${{ secrets.TOKEN }}
+          token: ${{ steps.generate_token.outputs.token }}
           repository: yuki-2525/vpm_sakurayuki_dev
           event-type: automatic-vpm-update
           client-payload: '{"env": "dev"}'

@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 using System;
 using System.Collections.Generic;
@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -120,9 +121,11 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public static void InitializeDefaultExcludeFolders()
         {
+            // DebugLogger.Log("Initializing Default Exclude Folders"); // 頻繁に呼び出される可能性があるためコメントアウト
             string excludeFoldersJson = EditorPrefs.GetString(PREFS_KEY_EXCLUDE_FOLDERS, "");
             if (string.IsNullOrEmpty(excludeFoldersJson))
             {
+                DebugLogger.Log("First time setup for exclude folders.");
                 string json = JsonUtility.ToJson(new ExcludeFoldersPrefsData
                 {
                     userFolders = new List<string>(),
@@ -195,6 +198,7 @@ namespace UnityEditorAssetBrowser.Services
             List<string> enabledDefaults
         )
         {
+            DebugLogger.Log($"Saving exclude folders. User: {userFolders.Count}, Default: {enabledDefaults.Count}");
             string jsonString = JsonUtility.ToJson(new ExcludeFoldersPrefsData
             {
                 userFolders = userFolders,
@@ -208,7 +212,8 @@ namespace UnityEditorAssetBrowser.Services
         /// 判定用の合成済みリスト（ユーザー追加分 + ONの初期設定分）を保存
         /// </summary>
         public static void SaveCombinedExcludePatterns(List<string> combined)
-        {
+        {DebugLogger.Log($"Saving combined exclude patterns. Count: {combined.Count}");
+            
             string json = JsonUtility.ToJson(new StringListWrapper { list = combined });
             EditorPrefs.SetString(PREFS_KEY_EXCLUDE_FOLDERS_COMBINED, json);
         }

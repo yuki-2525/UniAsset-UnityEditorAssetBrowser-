@@ -1,15 +1,16 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Services;
+using UnityEditorAssetBrowser.Helper; // Added
 using UnityEditorAssetBrowser.ViewModels;
 using UnityEditorAssetBrowser.Views;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Windows
 {
-    public class SettingsWindow : EditorWindow
+    public class SettingsWindow : EditorWindow, IHasCustomMenu
     {
         private SettingsView _settingsView;
         private AssetBrowserViewModel _assetBrowserViewModel;
@@ -22,7 +23,8 @@ namespace UnityEditorAssetBrowser.Windows
             PaginationViewModel paginationViewModel
         )
         {
-            var window = GetWindow<SettingsWindow>("設定");
+            DebugLogger.Log("Opening SettingsWindow.");
+            var window = GetWindow<SettingsWindow>(LocalizationService.Instance.GetString("settings_window_title"));
             window.minSize = new Vector2(400, 200);
             window._assetBrowserViewModel = assetBrowserViewModel;
             window._searchViewModel = searchViewModel;
@@ -40,7 +42,8 @@ namespace UnityEditorAssetBrowser.Windows
         {
             _settingsView = new SettingsView(
                 DatabaseService.OnAEDatabasePathChanged,
-                DatabaseService.OnKADatabasePathChanged
+                DatabaseService.OnKADatabasePathChanged,
+                DatabaseService.OnBOOTHLMDatabasePathChanged
             );
 
             _settingsView.OnSettingsChanged += () =>
@@ -56,6 +59,19 @@ namespace UnityEditorAssetBrowser.Windows
         private void OnGUI()
         {
             _settingsView.Draw();
+        }
+
+        public void AddItemsToMenu(GenericMenu menu)
+        {
+            const string debugKey = "UniAsset_DebugMode";
+            bool isDebug = EditorPrefs.GetBool(debugKey, false);
+
+            menu.AddItem(new GUIContent("Debug Mode"), isDebug, () =>
+            {
+                bool newState = !isDebug;
+                EditorPrefs.SetBool(debugKey, newState);
+                Debug.Log($"[UniAsset][Debug] Debug Mode toggled: {(newState ? "ON" : "OFF")}");
+            });
         }
     }
 }

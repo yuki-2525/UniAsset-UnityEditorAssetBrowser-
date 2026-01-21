@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from AETools(https://github.com/puk06/AE-Tools)
 // AETools is licensed under the MIT License. https://github.com/puk06/AE-Tools/blob/master/LICENSE.txt
 
@@ -92,12 +92,12 @@ namespace UnityEditorAssetBrowser.Helper
                 if (DateTime.TryParse(date, out DateTime result))
                     return result;
 
-                Debug.LogWarning($"Failed to parse date: {date}");
+                DebugLogger.LogWarning($"Failed to parse date: {date}");
                 return DateTimeOffset.FromUnixTimeMilliseconds(0).DateTime;
             }
             catch (Exception ex)
             {
-                Debug.LogWarning($"Failed to parse date: {date}, Error: {ex.Message}");
+                DebugLogger.LogWarning($"Failed to parse date: {date}, Error: {ex.Message}");
                 return DateTimeOffset.FromUnixTimeMilliseconds(0).DateTime;
             }
         }

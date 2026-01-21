@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Models;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.ViewModels
 {
@@ -17,6 +18,9 @@ namespace UnityEditorAssetBrowser.ViewModels
     {
         /// <summary>ページネーション情報</summary>
         private readonly PaginationInfo _paginationInfo;
+
+        /// <summary>ページ変更時に通知されるイベント</summary>
+        public event Action? OnPageChanged;
 
         /// <summary>
         /// コンストラクタ
@@ -70,7 +74,10 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// ページをリセット（1ページ目に戻す）
         /// </summary>
         public void ResetPage()
-            => _paginationInfo.ResetPage();
+        {
+            _paginationInfo.ResetPage();
+            OnPageChanged?.Invoke();
+        }
 
         /// <summary>
         /// 次のページに移動
@@ -78,14 +85,30 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <param name="totalPages">総ページ数</param>
         /// <returns>移動が成功したかどうか（現在のページが最後のページの場合はfalse）</returns>
         public bool MoveToNextPage(int totalPages)
-            => _paginationInfo.MoveToNextPage(totalPages);
+        {
+            bool result = _paginationInfo.MoveToNextPage(totalPages);
+            if (result)
+            {
+                DebugLogger.Log($"Moved to next page: {_paginationInfo.CurrentPage}");
+                OnPageChanged?.Invoke();
+            }
+            return result;
+        }
 
         /// <summary>
         /// 前のページに移動
         /// </summary>
         /// <returns>移動が成功したかどうか（現在のページが1ページ目の場合はfalse）</returns>
         public bool MoveToPreviousPage()
-            => _paginationInfo.MoveToPreviousPage();
+        {
+            bool result = _paginationInfo.MoveToPreviousPage();
+            if (result)
+            {
+                DebugLogger.Log($"Moved to previous page: {_paginationInfo.CurrentPage}");
+                OnPageChanged?.Invoke();
+            }
+            return result;
+        }
 
         /// <summary>
         /// 指定したページに移動
@@ -94,7 +117,15 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <param name="totalPages">総ページ数</param>
         /// <returns>移動が成功したかどうか（ページ番号が無効な場合はfalse）</returns>
         public bool MoveToPage(int page, int totalPages)
-            => _paginationInfo.MoveToPage(page, totalPages);
+        {
+            bool result = _paginationInfo.MoveToPage(page, totalPages);
+            if (result)
+            {
+                DebugLogger.Log($"Moved to page: {page}");
+                OnPageChanged?.Invoke();
+            }
+            return result;
+        }
 
         /// <summary>
         /// 現在のタブのアイテムを取得
@@ -102,13 +133,15 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// <param name="getFilteredAvatars">フィルターされたアバターを取得する関数</param>
         /// <param name="getFilteredItems">フィルターされたアイテムを取得する関数</param>
         /// <param name="getFilteredWorldObjects">フィルターされたワールドオブジェクトを取得する関数</param>
+        /// <param name="getListTabItems">リストタブのアイテムを取得する関数</param>
         /// <param name="getFilteredOthers">フィルターされたその他のアイテムを取得する関数</param>
         /// <returns>現在のタブのアイテムリスト</returns>
         public List<IDatabaseItem> GetCurrentTabItems(
             Func<List<IDatabaseItem>> getFilteredAvatars,
             Func<List<IDatabaseItem>> getFilteredItems,
             Func<List<IDatabaseItem>> getFilteredWorldObjects,
-            Func<List<IDatabaseItem>> getFilteredOthers
+            Func<List<IDatabaseItem>> getFilteredOthers,
+            Func<List<IDatabaseItem>> getListTabItems
         )
         {
             return _paginationInfo.SelectedTab switch
@@ -117,6 +150,7 @@ namespace UnityEditorAssetBrowser.ViewModels
                 1 => getFilteredItems(),
                 2 => getFilteredWorldObjects(),
                 3 => getFilteredOthers(),
+                4 => getListTabItems(),
                 _ => new List<IDatabaseItem>(),
             };
         }

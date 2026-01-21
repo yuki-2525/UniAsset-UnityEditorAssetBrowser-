@@ -25,7 +25,8 @@ namespace UnityEditorAssetBrowser.Windows
 
         public static void ShowWindow()
         {
-            var w = GetWindow<AboutWindow>(true, "このソフトについて", true);
+            DebugLogger.Log("Opening AboutWindow.");
+            var w = GetWindow<AboutWindow>(true, LocalizationService.Instance.GetString("about_window_title"), true);
             w.minSize = new Vector2(400, 220);
             w.Show();
         }
@@ -55,53 +56,57 @@ namespace UnityEditorAssetBrowser.Windows
 
             GUILayout.Space(8);
             EditorGUILayout.LabelField("UniAsset -UnityEditorAssetBrowser-", GUIStyleManager.BoldLabel);
-            EditorGUILayout.LabelField($"バージョン: {_version}", GUIStyleManager.Label);
-            EditorGUILayout.LabelField("開発者: sakurayuki", GUIStyleManager.Label);
+            EditorGUILayout.LabelField($"{LocalizationService.Instance.GetString("version")}: {_version}", GUIStyleManager.Label);
+            EditorGUILayout.LabelField($"{LocalizationService.Instance.GetString("developer")}: sakurayuki", GUIStyleManager.Label);
             EditorGUILayout.Space(6);
 
-            EditorGUILayout.LabelField("概要:", GUIStyleManager.BoldLabel);
-            EditorGUILayout.LabelField("Avatar ExplorerとKonoAssetによって保存されているアイテムを検索・表示し、簡単にインポートすることが出来るエディタ拡張です。", GUIStyleManager.WordWrappedLabel);
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("description_label"), GUIStyleManager.BoldLabel);
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("description_text"), GUIStyleManager.WordWrappedLabel);
             EditorGUILayout.Space(6);
 
-            EditorGUILayout.LabelField("ライセンス:", GUIStyleManager.BoldLabel);
-            EditorGUILayout.LabelField("このソフトはMIT ライセンスの下で配布されています。", GUIStyleManager.WordWrappedLabel);
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("license_label"), GUIStyleManager.BoldLabel);
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("license_text"), GUIStyleManager.WordWrappedLabel);
             EditorGUILayout.Space(6);
 
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("GitHubリポジトリ:", GUIStyleManager.BoldLabel);
-            if (GUILayout.Button(new GUIContent("GitHubを開く", "GitHub リポジトリをブラウザで開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("github_repo_label"), GUIStyleManager.BoldLabel);
+            if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_github"), "GitHub リポジトリをブラウザで開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening GitHub Repo.");
                 Application.OpenURL(RepoUrl);
             }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4);
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("サポート Discord サーバー:", GUIStyleManager.BoldLabel);
-            if (GUILayout.Button(new GUIContent("Discordを開く", "サポート用 Discord サーバーに移動します"), GUIStyleManager.Button, GUILayout.Width(180)))
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("discord_server_label"), GUIStyleManager.BoldLabel);
+            if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_discord"), "サポート用 Discord サーバーに移動します"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening Discord Server.");
                 Application.OpenURL(DiscordUrl);
             }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(4);
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("開発者X:", GUIStyleManager.BoldLabel);
-            if (GUILayout.Button(new GUIContent("Xを開く", "開発者の X (旧Twitter) ページを開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("developer_x_label"), GUIStyleManager.BoldLabel);
+            if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_x"), "開発者の X (旧Twitter) ページを開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening Developer X page.");
                 Application.OpenURL(DeveloperXUrl);
             }
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space(6);
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField("支援のお願い:", GUIStyleManager.BoldLabel);
-            if (GUILayout.Button(new GUIContent("支援ページを開く", "支援ページ (Fanbox) をブラウザで開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("support_request_label"), GUIStyleManager.BoldLabel);
+            if (GUILayout.Button(new GUIContent(LocalizationService.Instance.GetString("open_support_page"), "支援ページ (Fanbox) をブラウザで開きます"), GUIStyleManager.Button, GUILayout.Width(180)))
             {
+                DebugLogger.Log("Opening Fanbox page.");
                 Application.OpenURL(FanboxUrl);
             }
             EditorGUILayout.EndHorizontal();
-            EditorGUILayout.LabelField("みなさんの支援が開発のモチベーションとなります！", GUIStyleManager.WordWrappedLabel);
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("support_message"), GUIStyleManager.WordWrappedLabel);
 
             DrawSupporters();
 
@@ -113,7 +118,7 @@ namespace UnityEditorAssetBrowser.Windows
         private void DrawSupporters()
         {
             EditorGUILayout.Space(10);
-            EditorGUILayout.LabelField("Special Thanks (支援者のみなさま):", GUIStyleManager.BoldLabel);
+            EditorGUILayout.LabelField(LocalizationService.Instance.GetString("special_thanks"), GUIStyleManager.BoldLabel);
             
             EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
             

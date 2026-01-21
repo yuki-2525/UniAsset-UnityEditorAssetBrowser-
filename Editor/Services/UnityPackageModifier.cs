@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from Avatar-Explorer(https://github.com/puk06/Avatar-Explorer)
 // Avatar-Explorer is licensed under the MIT License. https://github.com/puk06/Avatar-Explorer/blob/master/LICENSE.txt
 using System;
@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -14,11 +15,14 @@ namespace UnityEditorAssetBrowser.Services
     {
         public static async Task<string> CreateModifiedPackageAsync(string sourcePath, string category)
         {
+            DebugLogger.Log($"Creating modified package. Source: {sourcePath}, Category: {category}");
             string tempDir = Path.Combine(Path.GetTempPath(), "UnityEditorAssetBrowser");
             if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
 
             string fileName = Path.GetFileNameWithoutExtension(sourcePath);
-            string destPath = Path.Combine(tempDir, $"{fileName}_modified_{Guid.NewGuid()}.unitypackage");
+            // UnityのAssetDatabase.ImportPackageは、パスに日本語が含まれていると「Couldn't decompress package」エラーで失敗することがあるため、
+            // 一時ファイル名はASCII文字のみで構成するようにする。
+            string destPath = Path.Combine(tempDir, $"temp_pkg_{Guid.NewGuid()}.unitypackage");
 
             await Task.Run(() =>
             {
@@ -44,17 +48,21 @@ namespace UnityEditorAssetBrowser.Services
 
             try
             {
-                var files = Directory.GetFiles(tempDir, "*_modified_*.unitypackage");
+                var files = Directory.GetFiles(tempDir, "*.unitypackage");
                 foreach (var file in files)
                 {
-                    try
+                    string fname = Path.GetFileName(file);
+                    if (fname.Contains("_modified_") || fname.StartsWith("temp_pkg_"))
                     {
-                        // 単純に削除を試みる。使用中の場合は例外が発生してスキップされる。
-                        File.Delete(file);
-                    }
-                    catch
-                    {
-                        // 無視
+                        try
+                        {
+                            // 単純に削除を試みる。使用中の場合は例外が発生してスキップされる。
+                            File.Delete(file);
+                        }
+                        catch
+                        {
+                            // 無視
+                        }
                     }
                 }
             }

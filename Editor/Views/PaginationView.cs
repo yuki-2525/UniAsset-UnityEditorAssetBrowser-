@@ -1,9 +1,10 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
 using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.ViewModels;
+using UnityEditorAssetBrowser.Services;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Views
@@ -52,8 +53,9 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawPreviousButton()
         {
-            if (GUILayout.Button("前へ", GUIStyleManager.Button, GUILayout.Width(100)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("prev_page"), GUIStyleManager.Button, GUILayout.Width(100)))
             {
+                DebugLogger.Log("Previous page button clicked");
                 _paginationViewModel.MoveToPreviousPage();
             }
         }
@@ -67,11 +69,12 @@ namespace UnityEditorAssetBrowser.Views
                 () => _assetBrowserViewModel.GetFilteredAvatars(),
                 () => _assetBrowserViewModel.GetFilteredItems(),
                 () => _assetBrowserViewModel.GetFilteredWorldObjects(),
-                () => _assetBrowserViewModel.GetFilteredOthers()
+                () => _assetBrowserViewModel.GetFilteredOthers(),
+                () => _assetBrowserViewModel.GetListTabItems()
             );
             
             int totalPages = _paginationViewModel.GetTotalPages(currentItems);
-            GUILayout.Label($"ページ {_paginationViewModel.CurrentPage + 1} / {totalPages}", GUIStyleManager.Label);
+            GUILayout.Label(string.Format(LocalizationService.Instance.GetString("page_info_format"), _paginationViewModel.CurrentPage + 1, totalPages), GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -79,13 +82,15 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawNextButton()
         {
-            if (GUILayout.Button("次へ", GUIStyleManager.Button, GUILayout.Width(100)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("next_page"), GUIStyleManager.Button, GUILayout.Width(100)))
             {
+                DebugLogger.Log("Next page button clicked");
                 var currentItems = _paginationViewModel.GetCurrentTabItems(
                     () => _assetBrowserViewModel.GetFilteredAvatars(),
                     () => _assetBrowserViewModel.GetFilteredItems(),
                     () => _assetBrowserViewModel.GetFilteredWorldObjects(),
-                    () => _assetBrowserViewModel.GetFilteredOthers()
+                    () => _assetBrowserViewModel.GetFilteredOthers(),
+                    () => _assetBrowserViewModel.GetListTabItems()
                 );
 
                 int totalPages = _paginationViewModel.GetTotalPages(currentItems);

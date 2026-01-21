@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -11,6 +11,7 @@ using UnityEditor;
 using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
+using UnityEditorAssetBrowser.Windows;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Views
@@ -46,18 +47,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             GUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
-            DrawItemHeader(
-                item.GetTitle(),
-                item.GetAuthor(),
-                item.GetImagePath(),
-                item.GetItemPath(),
-                item.GetCreatedDate(),
-                item.GetCategory(),
-                item.GetSupportedAvatars(),
-                item.GetTags(),
-                item.GetMemo(),
-                item.GetBoothId()
-            );
+            DrawItemHeader(item);
             DrawUnityPackageSection(item.GetItemPath(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
 
             GUILayout.EndVertical();
@@ -66,41 +56,21 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アイテムヘッダーの描画
         /// </summary>
-        /// <param name="title">タイトル</param>
-        /// <param name="author">作者名</param>
-        /// <param name="imagePath">画像パス</param>
-        /// <param name="itemPath">アイテムパス</param>
-        /// <param name="createdDate">作成日（ソート用）</param>
-        /// <param name="category">カテゴリ</param>
-        /// <param name="supportedAvatars">対応アバター</param>
-        /// <param name="tags">タグ</param>
-        /// <param name="memo">メモ</param>
-        /// <param name="boothItemId">BoothアイテムID</param>
-        private void DrawItemHeader(
-            string title,
-            string author,
-            string imagePath,
-            string itemPath,
-            DateTime createdDate,
-            string category,
-            string[] supportedAvatars,
-            string[] tags,
-            string memo,
-            int boothItemId = 0
-        )
+        /// <param name="item">アイテム</param>
+        private void DrawItemHeader(IDatabaseItem item)
         {
             GUILayout.BeginHorizontal();
 
-            DrawItemImage(imagePath);
+            DrawItemImage(item);
 
             GUILayout.BeginVertical();
             
-            DrawItemBasicInfo(title, author);
-            DrawItemMetadata(title, category, supportedAvatars, tags, memo);
-            DrawItemActionButtons(itemPath, boothItemId);
-
-            GUILayout.EndVertical();
+            DrawItemBasicInfo(item.GetTitle(), item.GetAuthor());
+            DrawItemMetadata(item.GetTitle(), item.GetCategory(), item.GetSupportedAvatars(), item.GetTags(), item.GetMemo());
+            DrawItemActionButtons(item.GetItemPath(), item.GetBoothId(), item.GetImagePath());
             
+            GUILayout.EndVertical();
+
             GUILayout.EndHorizontal();
         }
 
@@ -110,7 +80,7 @@ namespace UnityEditorAssetBrowser.Views
         private void DrawItemBasicInfo(string title, string author)
         {
             GUILayout.Label(title, GUIStyleManager.BoldLabel);
-            GUILayout.Label($"作者: {author}", GUIStyleManager.Label);
+            GUILayout.Label($"{LocalizationService.Instance.GetString("author")}{author}", GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -128,7 +98,7 @@ namespace UnityEditorAssetBrowser.Views
 
             // タグ
             if (tags.Length > 0)
-                GUILayout.Label($"タグ: {string.Join(", ", tags)}", GUIStyleManager.WordWrappedLabel);
+                GUILayout.Label($"{LocalizationService.Instance.GetString("tags")}{string.Join(", ", tags)}", GUIStyleManager.WordWrappedLabel);
 
             // メモ
             if (!string.IsNullOrEmpty(memo))
@@ -138,13 +108,21 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アクションボタン（エクスプローラー・Booth）を描画
         /// </summary>
-        private void DrawItemActionButtons(string itemPath, int boothItemId)
+        private void DrawItemActionButtons(string itemPath, int boothItemId, string imagePath)
         {
             EditorGUILayout.Space(5);
+            DrawSetFolderThumbnailButton(imagePath);
             DrawExplorerOpenButton(itemPath);
 
-            if (boothItemId <= 0) return;
-            DrawBoothOpenButton(boothItemId);
+            if (boothItemId > 0)
+            {
+                DrawBoothOpenButton(boothItemId);
+            }
+
+            if (!Directory.Exists(itemPath))
+            {
+                EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("download_data_missing"), MessageType.Info);
+            }
         }
 
         /// <summary>
@@ -152,9 +130,37 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void DrawBoothOpenButton(int boothItemId)
         {
-            if (GUILayout.Button("商品ページを開く", GUIStyleManager.Button, GUILayout.Width(150)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("open_product_page"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 Application.OpenURL($"https://booth.pm/ja/items/{boothItemId}");
+            }
+        }
+
+        /// <summary>
+        /// "フォルダにサムネイルを付与"ボタンを描画
+        /// </summary>
+        private void DrawSetFolderThumbnailButton(string imagePath)
+        {
+            if (GUILayout.Button(LocalizationService.Instance.GetString("set_folder_thumbnail"), GUIStyleManager.Button, GUILayout.Width(150)))
+            {
+                DebugLogger.Log("SetFolderThumbnail button clicked");
+                string folderPath = EditorUtility.OpenFolderPanel(
+                    LocalizationService.Instance.GetString("select_directory"),
+                    "Assets",
+                    ""
+                );
+
+                if (!string.IsNullOrEmpty(folderPath))
+                {
+                    DebugLogger.Log($"Selected folder for thumbnail: {folderPath}");
+                    // Assetsフォルダからの相対パスに変換
+                    if (folderPath.StartsWith(Application.dataPath))
+                    {
+                        folderPath = "Assets" + folderPath.Substring(Application.dataPath.Length);
+                    }
+                    
+                    UnityPackageServices.SetFolderThumbnails(new List<string> { folderPath }, imagePath, true);
+                }
             }
         }
 
@@ -165,7 +171,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="category">カテゴリ</param>
         private void DrawCategory(string category)
         {
-            GUILayout.Label($"カテゴリ: {category}", GUIStyleManager.Label);
+            GUILayout.Label($"{LocalizationService.Instance.GetString("category")}{category}", GUIStyleManager.Label);
         }
 
         /// <summary>
@@ -174,7 +180,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="supportedAvatars">対応アバターのパス配列</param>
         private void DrawSupportedAvatars(string[] supportedAvatars)
         {
-            string supportedAvatarsText = $"対応アバター: {string.Join(", ", supportedAvatars)}";
+            string supportedAvatarsText = $"{LocalizationService.Instance.GetString("supported_avatars")}{string.Join(", ", supportedAvatars)}";
 
             GUILayout.Label(supportedAvatarsText, GUIStyleManager.WordWrappedLabel);
         }
@@ -203,7 +209,7 @@ namespace UnityEditorAssetBrowser.Views
                 Event.current.Use();
             }
 
-            string toggleText = _memoFoldouts[memoKey] ? "▼メモ" : "▶メモ";
+            string toggleText = _memoFoldouts[memoKey] ? $"▼{LocalizationService.Instance.GetString("memo")}" : $"▶{LocalizationService.Instance.GetString("memo")}";
             EditorGUI.LabelField(boxRect, toggleText, GUIStyleManager.Label);
 
             if (_memoFoldouts[memoKey])
@@ -228,18 +234,33 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アイテム画像の描画
         /// </summary>
-        /// <param name="imagePath">画像パス</param>
-        private void DrawItemImage(string imagePath)
+        /// <param name="item">表示するアイテム</param>
+        private void DrawItemImage(IDatabaseItem item)
         {
+            string imagePath = item.GetImagePath();
             if (string.IsNullOrEmpty(imagePath)) return;
 
-            if (File.Exists(imagePath))
+            // URLまたはローカルファイルパスのチェック
+            bool isUrl = imagePath.StartsWith("http://") || imagePath.StartsWith("https://");
+            if (isUrl || File.Exists(imagePath))
             {
                 var texture = ImageServices.Instance.LoadTexture(imagePath);
                 if (texture == null) return;
 
                 int size = GUIStyleManager.IconSize;
                 GUILayout.Label(texture, GUILayout.Width(size), GUILayout.Height(size));
+
+                Rect imageRect = GUILayoutUtility.GetLastRect();
+                
+                // ドラッグ開始処理
+                if (Event.current.type == EventType.MouseDrag && imageRect.Contains(Event.current.mousePosition))
+                {
+                    DragAndDrop.PrepareStartDrag();
+                    DragAndDrop.SetGenericData("ImportQueue_DatabaseItem", item);
+                    DragAndDrop.objectReferences = new UnityEngine.Object[0];
+                    DragAndDrop.StartDrag(item.GetTitle());
+                    Event.current.Use();
+                }
             }
         }
 
@@ -251,8 +272,9 @@ namespace UnityEditorAssetBrowser.Views
         {
             if (!Directory.Exists(itemPath)) return;
 
-            if (GUILayout.Button("Explorerで開く", GUIStyleManager.Button, GUILayout.Width(150)))
+            if (GUILayout.Button(LocalizationService.Instance.GetString("open_explorer"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
+                DebugLogger.Log($"Opening explorer for path: {itemPath}");
                 Process.Start("explorer.exe", itemPath);
             }
         }
@@ -269,8 +291,8 @@ namespace UnityEditorAssetBrowser.Views
             var parts = directory.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
             string labelText;
 
-            // 親フォルダの1つ上がUUID（GUID）形式の場合は、冗長なので表示を省略する
-            if (parts.Length >= 2 && Guid.TryParse(parts[parts.Length - 2], out _))
+            // 親フォルダの1つ上がUUID（GUID）形式、または英小文字+数字形式の場合は、冗長なので表示を省略する
+            if (parts.Length >= 2 && (Guid.TryParse(parts[parts.Length - 2], out _) || System.Text.RegularExpressions.Regex.IsMatch(parts[parts.Length - 2], @"^[a-z]\d+$")))
             {
                 labelText = parts.Last() + "/" + Path.GetFileName(package);
             }
@@ -345,11 +367,13 @@ namespace UnityEditorAssetBrowser.Views
             }
 
             GUIContent labelContent = new GUIContent(displayLabel, tooltip);
+            Rect labelRect;
 
             if (isMultiLine)
             {
                 GUILayout.BeginVertical();
                 GUILayout.Label(labelContent, GUIStyleManager.Label);
+                labelRect = GUILayoutUtility.GetLastRect();
                 GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
                 GUILayout.FlexibleSpace();
             }
@@ -357,21 +381,68 @@ namespace UnityEditorAssetBrowser.Views
             {
                 GUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));
                 GUILayout.Label(labelContent, GUIStyleManager.Label);
+                labelRect = GUILayoutUtility.GetLastRect();
                 GUILayout.FlexibleSpace();
             }
 
+            // ドラッグ開始処理
+            if (Event.current.type == EventType.MouseDrag && labelRect.Contains(Event.current.mousePosition))
+            {
+                DebugLogger.Log($"Started dragging package: {Path.GetFileName(package)}");
+                DragAndDrop.PrepareStartDrag();
+                var item = new Models.ImportQueueItem
+                {
+                    PackagePath = package,
+                    PackageName = Path.GetFileName(package),
+                    ThumbnailPath = imagePath,
+                    Category = category
+                };
+                DragAndDrop.SetGenericData("ImportQueueItem", item);
+                DragAndDrop.StartDrag(item.PackageName);
+                Event.current.Use();
+            }
+
             // ボタンの矩形を確保
-            var buttonContent = new GUIContent("インポート");
+            var buttonContent = new GUIContent(LocalizationService.Instance.GetString("import"));
             var buttonRect = GUILayoutUtility.GetRect(buttonContent, GUIStyleManager.Button, GUILayout.Width(buttonWidth));
 
             // 右クリックメニューの表示
             if (Event.current.type == EventType.ContextClick && buttonRect.Contains(Event.current.mousePosition))
             {
                 var menu = new GenericMenu();
-                menu.AddItem(new GUIContent("カテゴリフォルダ下にインポート"), false, () => 
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true));
-                menu.AddItem(new GUIContent("直接インポート"), false, () => 
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false));
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_under_category")), false, () => 
+                {
+                    DebugLogger.Log($"Context Menu: Import under category selected for {package}");
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true);
+                });
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_directly")), false, () => 
+                {
+                    DebugLogger.Log($"Context Menu: Import directly selected for {package}");
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false);
+                });
+                
+                menu.AddSeparator("");
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
+                {
+                    DebugLogger.Log($"Context Menu: Add to import list selected for {package}");
+                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
+                    ImportQueueWindow.ShowWindow();
+                });
+
+                menu.ShowAsContext();
+                Event.current.Use();
+            }
+
+            // ラベル上での右クリックメニュー
+            if (Event.current.type == EventType.ContextClick && labelRect.Contains(Event.current.mousePosition))
+            {
+                var menu = new GenericMenu();
+                menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
+                {
+                    DebugLogger.Log($"Label Context Menu: Add to import list selected for {package}");
+                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
+                    ImportQueueWindow.ShowWindow();
+                });
                 menu.ShowAsContext();
                 Event.current.Use();
             }
@@ -384,6 +455,7 @@ namespace UnityEditorAssetBrowser.Views
             {
                 if (Event.current.type == EventType.Repaint)
                 {
+                    DebugLogger.Log($"Import button clicked for {package}");
                     GUIStyleManager.Button.Draw(buttonRect, buttonContent, false, false, false, false);
                 }
             }
@@ -392,7 +464,7 @@ namespace UnityEditorAssetBrowser.Views
                 // 左クリック（通常のボタン動作）
                 if (GUI.Button(buttonRect, buttonContent, GUIStyleManager.Button))
                 {
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, null);
+                    DebugLogger.Log($"Import button clicked for {package}");   UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, null);
                 }
             }
 
@@ -453,7 +525,7 @@ namespace UnityEditorAssetBrowser.Views
                 if (Event.current.type == EventType.MouseDown && boxRect.Contains(Event.current.mousePosition))
                 {
                     _unityPackageFoldouts[itemName] = !_unityPackageFoldouts[itemName];
-                    GUI.changed = true;
+                    DebugLogger.Log($"UnityPackage foldout toggled for {itemName}: {_unityPackageFoldouts[itemName]}");
                     Event.current.Use();
                 }
 
@@ -463,23 +535,104 @@ namespace UnityEditorAssetBrowser.Views
                     _unityPackageFoldouts[itemName],
                     ""
                 );
-                EditorGUI.LabelField(labelRect, "UnityPackage", GUIStyleManager.Label);
+                EditorGUI.LabelField(labelRect, LocalizationService.Instance.GetString("unity_package"), GUIStyleManager.Label);
 
                 if (_unityPackageFoldouts[itemName])
                 {
                     EditorGUI.indentLevel++;
-                    for (int i = 0; i < unityPackages.Count(); i++)
-                    {
-                        DrawUnityPackageItem(unityPackages.ElementAt(i), imagePath, category);
 
-                        // 最後のアイテム以外の後に線を描画
-                        if (i < unityPackages.Count() - 1)
+                    // パッケージを分類
+                    var keywords = new[] { "mat", "material", "tex", "texture", "base", "source","共通" };
+                    
+                    var scoredPackages = unityPackages.Select(p => 
+                    {
+                        string fileName = Path.GetFileName(p);
+                        int score = keywords.Sum(k => 
                         {
-                            var lineRect = EditorGUILayout.GetControlRect(false, 1);
-                            Color lineColor = LineColors[i % LineColors.Length];
-                            EditorGUI.DrawRect(lineRect, lineColor);
+                            int count = 0;
+                            int i = 0;
+                            while ((i = fileName.IndexOf(k, i, StringComparison.OrdinalIgnoreCase)) != -1)
+                            {
+                                i += k.Length;
+                                count++;
+                            }
+                            return count;
+                        });
+                        return new { Package = p, Score = score };
+                    }).ToList();
+
+                    int maxScore = scoredPackages.Any() ? scoredPackages.Max(x => x.Score) : 0;
+
+                    List<string> materialPackages;
+                    List<string> otherPackages;
+
+                    if (maxScore > 0)
+                    {
+                        materialPackages = scoredPackages
+                            .Where(x => x.Score == maxScore)
+                            .Select(x => x.Package)
+                            .ToList();
+                        
+                        otherPackages = scoredPackages
+                            .Where(x => x.Score < maxScore)
+                            .Select(x => x.Package)
+                            .ToList();
+                    }
+                    else
+                    {
+                        materialPackages = new List<string>();
+                        otherPackages = unityPackages.ToList();
+                    }
+
+                    // unityPackages > 2 かつ materialPackages > otherPackages の場合は全てotherPackagesとして処理
+                    if (unityPackages.Count() > 2 && materialPackages.Count > otherPackages.Count)
+                    {
+                        materialPackages.Clear();
+                        otherPackages = unityPackages.ToList();
+                    }
+
+                    int lineIndex = 0;
+
+                    // マテリアルパッケージの描画
+                    if (materialPackages.Any())
+                    {
+                        EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                        EditorGUILayout.LabelField(LocalizationService.Instance.GetString("material"), EditorStyles.miniBoldLabel);
+
+                        for (int i = 0; i < materialPackages.Count; i++)
+                        {
+                            DrawUnityPackageItem(materialPackages[i], imagePath, category);
+
+                            if (i < materialPackages.Count - 1)
+                            {
+                                var lineRect = EditorGUILayout.GetControlRect(false, 1);
+                                Color lineColor = LineColors[lineIndex % LineColors.Length];
+                                EditorGUI.DrawRect(lineRect, lineColor);
+                                lineIndex++;
+                            }
+                        }
+                        EditorGUILayout.EndVertical();
+
+                        if (otherPackages.Any())
+                        {
+                            EditorGUILayout.Space(2);
                         }
                     }
+
+                    // その他のパッケージの描画
+                    for (int i = 0; i < otherPackages.Count; i++)
+                    {
+                        DrawUnityPackageItem(otherPackages[i], imagePath, category);
+
+                        if (i < otherPackages.Count - 1)
+                        {
+                            var lineRect = EditorGUILayout.GetControlRect(false, 1);
+                            Color lineColor = LineColors[lineIndex % LineColors.Length];
+                            EditorGUI.DrawRect(lineRect, lineColor);
+                            lineIndex++;
+                        }
+                    }
+
                     EditorGUI.indentLevel--;
                 }
 

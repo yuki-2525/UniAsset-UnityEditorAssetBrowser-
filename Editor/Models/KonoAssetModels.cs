@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from AETools(https://github.com/puk06/AE-Tools)
 // AETools is licensed under the MIT License. https://github.com/puk06/AE-Tools/blob/master/LICENSE.txt
 
@@ -6,12 +6,22 @@
 
 using System;
 using System.IO;
+using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
 
 namespace UnityEditorAssetBrowser.Models
 {
+    /// <summary>
+    /// 統合されたKonoAssetデータベース
+    /// 全てのKonoAssetデータベースのアイテムをまとめて管理する
+    /// </summary>
+    public class UnifiedKonoAssetDatabase
+    {
+        public List<IDatabaseItem> Items { get; set; } = new List<IDatabaseItem>();
+    }
+
     // #region Base Database Models
     // /// <summary>
     // /// KonoAssetの基本データベースモデル
@@ -141,6 +151,8 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
 
     /// <summary>
@@ -178,11 +190,13 @@ namespace UnityEditorAssetBrowser.Models
         public int GetBoothId()
             => Description.BoothItemId ?? -1;
         public string GetCategory()
-            => "アバター";
+            => LocalizationService.Instance.GetString("category_avatar");
         public string[] GetTags()
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
 
     /// <summary>
@@ -231,6 +245,8 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
 
     /// <summary>
@@ -279,6 +295,8 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Tags;
         public DateTime GetCreatedDate()
             => DateTimeOffset.FromUnixTimeMilliseconds(Description.CreatedAt).DateTime;
+        public DateTime GetUpdatedDate()
+            => GetCreatedDate();
     }
     #endregion
 

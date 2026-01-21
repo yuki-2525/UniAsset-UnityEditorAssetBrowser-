@@ -1,7 +1,8 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 using System.Collections.Generic;
 using UnityEditorAssetBrowser.Models;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.ViewModels
 {
@@ -31,6 +32,7 @@ namespace UnityEditorAssetBrowser.ViewModels
         {
             if (_currentTabIndex != tabIndex)
             {
+                DebugLogger.Log($"SearchCriteriaManager Tab Changed: {_currentTabIndex} -> {tabIndex}");
                 SaveCurrentTabCriteria();
                 _currentTabIndex = tabIndex;
                 LoadTabCriteria();

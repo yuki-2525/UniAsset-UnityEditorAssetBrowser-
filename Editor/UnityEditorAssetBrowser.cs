@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -20,11 +20,6 @@ namespace UnityEditorAssetBrowser
     /// </summary>
     public class UnityEditorAssetBrowser : EditorWindow
     {
-        #region Constants
-        /// <summary>ウィンドウのタイトル</summary>
-        private const string WINDOW_TITLE = "Asset Browser";
-        #endregion
-
         #region Fields
         /// <summary>ページネーション情報</summary>
         private readonly PaginationInfo _paginationInfo = new();
@@ -58,7 +53,10 @@ namespace UnityEditorAssetBrowser
         [MenuItem("Window/Unity Editor Asset Browser")]
         public static void ShowWindow()
         {
-            GetWindow<UnityEditorAssetBrowser>(WINDOW_TITLE);
+            var window = GetWindow<UnityEditorAssetBrowser>();
+            window.titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
+            window.Show();
+            Helper.DebugLogger.Log("UnityEditorAssetBrowser window shown.");
         }
 
         /// <summary>
@@ -66,6 +64,10 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnEnable()
         {
+            Helper.DebugLogger.Log("UnityEditorAssetBrowser OnEnable called.");
+            titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
+            LocalizationService.Instance.OnLanguageChanged += UpdateTitle;
+
             // 除外フォルダ初期化と合成済みリスト保存
             ExcludeFolderService.InitializeDefaultExcludeFolders();
 
@@ -118,10 +120,15 @@ namespace UnityEditorAssetBrowser
                 DatabaseService.GetKAWearablesDatabase(),
                 DatabaseService.GetKAWorldObjectsDatabase(),
                 DatabaseService.GetKAOtherAssetsDatabase(),
+                DatabaseService.GetBOOTHLMDatabase(),
                 _paginationInfo,
                 _searchViewModel
             );
+            _assetBrowserViewModel.Initialize();
             _assetItemView = new AssetItemView();
+
+            // ViewModelをDatabaseServiceに登録して、DB更新時にViewModelも更新されるようにする
+            DatabaseService.SetViewModels(_assetBrowserViewModel, _searchViewModel, _paginationViewModel);
         }
 
         /// <summary>
@@ -159,7 +166,14 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnDisable()
         {
+            LocalizationService.Instance.OnLanguageChanged -= UpdateTitle;
             UnregisterEventHandlers();
+        }
+
+        private void UpdateTitle()
+        {
+            titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title"));
+            Repaint();
         }
 
         /// <summary>
@@ -175,12 +189,14 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnHierarchyChanged()
         {
+            Helper.DebugLogger.Log("Hierarchy changed. Reloading databases and clearing image cache.");
             // 画像キャッシュをクリア
             ImageServices.Instance.ClearCache();
 
             // データベースを再読み込み
             DatabaseService.LoadAEDatabase();
             DatabaseService.LoadKADatabase();
+            DatabaseService.LoadBOOTHLMDatabase();
             _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
 
             // 現在表示中のアイテムの画像を再読み込み
