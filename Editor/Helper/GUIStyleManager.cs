@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -24,6 +24,7 @@ namespace UnityEditorAssetBrowser.Helper
         private static GUIStyle? _boldLabelStyle;
         private static GUIStyle? _wordWrappedLabelStyle;
         private static GUIStyle? _buttonStyle;
+        private static GUIStyle? _largeButtonStyle;
         private static GUIStyle? _textFieldStyle;
         private static GUIStyle? _popupStyle;
         private static GUIStyle? _foldoutStyle;
@@ -47,6 +48,10 @@ namespace UnityEditorAssetBrowser.Helper
             int size = FontSize;
             if (_currentFontSize != size)
             {
+                if (_currentFontSize != -1)
+                {
+                    DebugLogger.Log($"Font size changed from {_currentFontSize} to {size}. Rebuilding styles.");
+                }
                 _currentFontSize = size;
                 _titleStyle = null;
                 _boxStyle = null;
@@ -54,6 +59,7 @@ namespace UnityEditorAssetBrowser.Helper
                 _boldLabelStyle = null;
                 _wordWrappedLabelStyle = null;
                 _buttonStyle = null;
+                _largeButtonStyle = null;
                 _textFieldStyle = null;
                 _popupStyle = null;
                 _foldoutStyle = null;
@@ -122,6 +128,24 @@ namespace UnityEditorAssetBrowser.Helper
                     fontSize = _currentFontSize
                 };
                 return _buttonStyle;
+            }
+        }
+
+        /// <summary>
+        /// 大きいボタンスタイル
+        /// </summary>
+        public static GUIStyle LargeButton
+        {
+            get
+            {
+                EnsureStyles();
+                _largeButtonStyle ??= new GUIStyle(GUI.skin.button)
+                {
+                    fontSize = _currentFontSize + 12, // かなり大きくする
+                    alignment = TextAnchor.MiddleLeft,
+                    padding = new RectOffset(10, 10, 10, 10)
+                };
+                return _largeButtonStyle;
             }
         }
 

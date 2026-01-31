@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -47,18 +47,7 @@ namespace UnityEditorAssetBrowser.Views
         {
             GUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
-            DrawItemHeader(
-                item.GetTitle(),
-                item.GetAuthor(),
-                item.GetImagePath(),
-                item.GetItemPath(),
-                item.GetCreatedDate(),
-                item.GetCategory(),
-                item.GetSupportedAvatars(),
-                item.GetTags(),
-                item.GetMemo(),
-                item.GetBoothId()
-            );
+            DrawItemHeader(item);
             DrawUnityPackageSection(item.GetItemPath(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
 
             GUILayout.EndVertical();
@@ -67,41 +56,21 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アイテムヘッダーの描画
         /// </summary>
-        /// <param name="title">タイトル</param>
-        /// <param name="author">作者名</param>
-        /// <param name="imagePath">画像パス</param>
-        /// <param name="itemPath">アイテムパス</param>
-        /// <param name="createdDate">作成日（ソート用）</param>
-        /// <param name="category">カテゴリ</param>
-        /// <param name="supportedAvatars">対応アバター</param>
-        /// <param name="tags">タグ</param>
-        /// <param name="memo">メモ</param>
-        /// <param name="boothItemId">BoothアイテムID</param>
-        private void DrawItemHeader(
-            string title,
-            string author,
-            string imagePath,
-            string itemPath,
-            DateTime createdDate,
-            string category,
-            string[] supportedAvatars,
-            string[] tags,
-            string memo,
-            int boothItemId = 0
-        )
+        /// <param name="item">アイテム</param>
+        private void DrawItemHeader(IDatabaseItem item)
         {
             GUILayout.BeginHorizontal();
 
-            DrawItemImage(imagePath);
+            DrawItemImage(item);
 
             GUILayout.BeginVertical();
             
-            DrawItemBasicInfo(title, author);
-            DrawItemMetadata(title, category, supportedAvatars, tags, memo);
-            DrawItemActionButtons(itemPath, boothItemId);
-
-            GUILayout.EndVertical();
+            DrawItemBasicInfo(item.GetTitle(), item.GetAuthor());
+            DrawItemMetadata(item.GetTitle(), item.GetCategory(), item.GetSupportedAvatars(), item.GetTags(), item.GetMemo());
+            DrawItemActionButtons(item.GetItemPath(), item.GetBoothId(), item.GetImagePath());
             
+            GUILayout.EndVertical();
+
             GUILayout.EndHorizontal();
         }
 
@@ -139,13 +108,21 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アクションボタン（エクスプローラー・Booth）を描画
         /// </summary>
-        private void DrawItemActionButtons(string itemPath, int boothItemId)
+        private void DrawItemActionButtons(string itemPath, int boothItemId, string imagePath)
         {
             EditorGUILayout.Space(5);
+            DrawSetFolderThumbnailButton(imagePath);
             DrawExplorerOpenButton(itemPath);
 
-            if (boothItemId <= 0) return;
-            DrawBoothOpenButton(boothItemId);
+            if (boothItemId > 0)
+            {
+                DrawBoothOpenButton(boothItemId);
+            }
+
+            if (!Directory.Exists(itemPath))
+            {
+                EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("download_data_missing"), MessageType.Info);
+            }
         }
 
         /// <summary>
@@ -156,6 +133,34 @@ namespace UnityEditorAssetBrowser.Views
             if (GUILayout.Button(LocalizationService.Instance.GetString("open_product_page"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 Application.OpenURL($"https://booth.pm/ja/items/{boothItemId}");
+            }
+        }
+
+        /// <summary>
+        /// "フォルダにサムネイルを付与"ボタンを描画
+        /// </summary>
+        private void DrawSetFolderThumbnailButton(string imagePath)
+        {
+            if (GUILayout.Button(LocalizationService.Instance.GetString("set_folder_thumbnail"), GUIStyleManager.Button, GUILayout.Width(150)))
+            {
+                DebugLogger.Log("SetFolderThumbnail button clicked");
+                string folderPath = EditorUtility.OpenFolderPanel(
+                    LocalizationService.Instance.GetString("select_directory"),
+                    "Assets",
+                    ""
+                );
+
+                if (!string.IsNullOrEmpty(folderPath))
+                {
+                    DebugLogger.Log($"Selected folder for thumbnail: {folderPath}");
+                    // Assetsフォルダからの相対パスに変換
+                    if (folderPath.StartsWith(Application.dataPath))
+                    {
+                        folderPath = "Assets" + folderPath.Substring(Application.dataPath.Length);
+                    }
+                    
+                    UnityPackageServices.SetFolderThumbnails(new List<string> { folderPath }, imagePath, true);
+                }
             }
         }
 
@@ -229,18 +234,33 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アイテム画像の描画
         /// </summary>
-        /// <param name="imagePath">画像パス</param>
-        private void DrawItemImage(string imagePath)
+        /// <param name="item">表示するアイテム</param>
+        private void DrawItemImage(IDatabaseItem item)
         {
+            string imagePath = item.GetImagePath();
             if (string.IsNullOrEmpty(imagePath)) return;
 
-            if (File.Exists(imagePath))
+            // URLまたはローカルファイルパスのチェック
+            bool isUrl = imagePath.StartsWith("http://") || imagePath.StartsWith("https://");
+            if (isUrl || File.Exists(imagePath))
             {
                 var texture = ImageServices.Instance.LoadTexture(imagePath);
                 if (texture == null) return;
 
                 int size = GUIStyleManager.IconSize;
                 GUILayout.Label(texture, GUILayout.Width(size), GUILayout.Height(size));
+
+                Rect imageRect = GUILayoutUtility.GetLastRect();
+                
+                // ドラッグ開始処理
+                if (Event.current.type == EventType.MouseDrag && imageRect.Contains(Event.current.mousePosition))
+                {
+                    DragAndDrop.PrepareStartDrag();
+                    DragAndDrop.SetGenericData("ImportQueue_DatabaseItem", item);
+                    DragAndDrop.objectReferences = new UnityEngine.Object[0];
+                    DragAndDrop.StartDrag(item.GetTitle());
+                    Event.current.Use();
+                }
             }
         }
 
@@ -254,6 +274,7 @@ namespace UnityEditorAssetBrowser.Views
 
             if (GUILayout.Button(LocalizationService.Instance.GetString("open_explorer"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
+                DebugLogger.Log($"Opening explorer for path: {itemPath}");
                 Process.Start("explorer.exe", itemPath);
             }
         }
@@ -270,8 +291,8 @@ namespace UnityEditorAssetBrowser.Views
             var parts = directory.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
             string labelText;
 
-            // 親フォルダの1つ上がUUID（GUID）形式の場合は、冗長なので表示を省略する
-            if (parts.Length >= 2 && Guid.TryParse(parts[parts.Length - 2], out _))
+            // 親フォルダの1つ上がUUID（GUID）形式、または英小文字+数字形式の場合は、冗長なので表示を省略する
+            if (parts.Length >= 2 && (Guid.TryParse(parts[parts.Length - 2], out _) || System.Text.RegularExpressions.Regex.IsMatch(parts[parts.Length - 2], @"^[a-z]\d+$")))
             {
                 labelText = parts.Last() + "/" + Path.GetFileName(package);
             }
@@ -367,6 +388,7 @@ namespace UnityEditorAssetBrowser.Views
             // ドラッグ開始処理
             if (Event.current.type == EventType.MouseDrag && labelRect.Contains(Event.current.mousePosition))
             {
+                DebugLogger.Log($"Started dragging package: {Path.GetFileName(package)}");
                 DragAndDrop.PrepareStartDrag();
                 var item = new Models.ImportQueueItem
                 {
@@ -389,13 +411,20 @@ namespace UnityEditorAssetBrowser.Views
             {
                 var menu = new GenericMenu();
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_under_category")), false, () => 
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true));
+                {
+                    DebugLogger.Log($"Context Menu: Import under category selected for {package}");
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true);
+                });
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_directly")), false, () => 
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false));
+                {
+                    DebugLogger.Log($"Context Menu: Import directly selected for {package}");
+                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false);
+                });
                 
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
                 {
+                    DebugLogger.Log($"Context Menu: Add to import list selected for {package}");
                     ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
                     ImportQueueWindow.ShowWindow();
                 });
@@ -410,6 +439,7 @@ namespace UnityEditorAssetBrowser.Views
                 var menu = new GenericMenu();
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
                 {
+                    DebugLogger.Log($"Label Context Menu: Add to import list selected for {package}");
                     ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
                     ImportQueueWindow.ShowWindow();
                 });
@@ -425,6 +455,7 @@ namespace UnityEditorAssetBrowser.Views
             {
                 if (Event.current.type == EventType.Repaint)
                 {
+                    DebugLogger.Log($"Import button clicked for {package}");
                     GUIStyleManager.Button.Draw(buttonRect, buttonContent, false, false, false, false);
                 }
             }
@@ -433,7 +464,7 @@ namespace UnityEditorAssetBrowser.Views
                 // 左クリック（通常のボタン動作）
                 if (GUI.Button(buttonRect, buttonContent, GUIStyleManager.Button))
                 {
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, null);
+                    DebugLogger.Log($"Import button clicked for {package}");   UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, null);
                 }
             }
 
@@ -494,7 +525,7 @@ namespace UnityEditorAssetBrowser.Views
                 if (Event.current.type == EventType.MouseDown && boxRect.Contains(Event.current.mousePosition))
                 {
                     _unityPackageFoldouts[itemName] = !_unityPackageFoldouts[itemName];
-                    GUI.changed = true;
+                    DebugLogger.Log($"UnityPackage foldout toggled for {itemName}: {_unityPackageFoldouts[itemName]}");
                     Event.current.Use();
                 }
 

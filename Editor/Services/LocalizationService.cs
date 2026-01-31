@@ -1,3 +1,4 @@
+// Copyright (c) 2025-2026 sakurayuki
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -6,6 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEditorAssetBrowser.Models;
 using Newtonsoft.Json;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -29,6 +31,7 @@ namespace UnityEditorAssetBrowser.Services
             {
                 if (_currentLanguage != value)
                 {
+                    DebugLogger.Log($"Language changed: {_currentLanguage} -> {value}");
                     _currentLanguage = value;
                     EditorPrefs.SetString(PREF_KEY, value);
                     OnLanguageChanged?.Invoke();
@@ -47,12 +50,13 @@ namespace UnityEditorAssetBrowser.Services
 
         public void LoadLocalizationData()
         {
+            DebugLogger.Log($"Loading localization data. Current Language: {_currentLanguage}");
             _localizedText = new Dictionary<string, Dictionary<string, string>>();
 
             var guids = AssetDatabase.FindAssets("LocalizationService t:MonoScript");
             if (guids.Length == 0)
             {
-                Debug.LogError("[UniAsset] LocalizationService script not found.");
+                DebugLogger.LogError("LocalizationService script not found.");
                 return;
             }
             var scriptPath = AssetDatabase.GUIDToAssetPath(guids[0]);
@@ -85,7 +89,7 @@ namespace UnityEditorAssetBrowser.Services
                     }
                     catch (Exception e)
                     {
-                        Debug.LogError($"[UniAsset] Failed to load localization file {path}: {e.Message}");
+                        DebugLogger.LogError($"Failed to load localization file {path}: {e.Message}");
                     }
                 }
             }

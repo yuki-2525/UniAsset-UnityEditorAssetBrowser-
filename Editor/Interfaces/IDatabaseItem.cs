@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // Code Written by puk06
 
 using System;
@@ -69,5 +69,11 @@ namespace UnityEditorAssetBrowser.Interfaces
         /// </summary>
         /// <returns></returns>
         public DateTime GetCreatedDate();
+
+        /// <summary>
+        /// アイテムの更新日時を取得します
+        /// </summary>
+        /// <returns></returns>
+        public DateTime GetUpdatedDate();
     }
 }

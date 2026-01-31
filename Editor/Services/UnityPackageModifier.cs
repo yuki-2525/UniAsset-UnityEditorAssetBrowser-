@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from Avatar-Explorer(https://github.com/puk06/Avatar-Explorer)
 // Avatar-Explorer is licensed under the MIT License. https://github.com/puk06/Avatar-Explorer/blob/master/LICENSE.txt
 using System;
@@ -7,6 +7,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -14,6 +15,7 @@ namespace UnityEditorAssetBrowser.Services
     {
         public static async Task<string> CreateModifiedPackageAsync(string sourcePath, string category)
         {
+            DebugLogger.Log($"Creating modified package. Source: {sourcePath}, Category: {category}");
             string tempDir = Path.Combine(Path.GetTempPath(), "UnityEditorAssetBrowser");
             if (!Directory.Exists(tempDir)) Directory.CreateDirectory(tempDir);
 

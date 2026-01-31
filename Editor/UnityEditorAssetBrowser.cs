@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -56,6 +56,7 @@ namespace UnityEditorAssetBrowser
             var window = GetWindow<UnityEditorAssetBrowser>();
             window.titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
             window.Show();
+            Helper.DebugLogger.Log("UnityEditorAssetBrowser window shown.");
         }
 
         /// <summary>
@@ -63,6 +64,7 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnEnable()
         {
+            Helper.DebugLogger.Log("UnityEditorAssetBrowser OnEnable called.");
             titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title") ?? "Asset Browser");
             LocalizationService.Instance.OnLanguageChanged += UpdateTitle;
 
@@ -118,10 +120,15 @@ namespace UnityEditorAssetBrowser
                 DatabaseService.GetKAWearablesDatabase(),
                 DatabaseService.GetKAWorldObjectsDatabase(),
                 DatabaseService.GetKAOtherAssetsDatabase(),
+                DatabaseService.GetBOOTHLMDatabase(),
                 _paginationInfo,
                 _searchViewModel
             );
+            _assetBrowserViewModel.Initialize();
             _assetItemView = new AssetItemView();
+
+            // ViewModelをDatabaseServiceに登録して、DB更新時にViewModelも更新されるようにする
+            DatabaseService.SetViewModels(_assetBrowserViewModel, _searchViewModel, _paginationViewModel);
         }
 
         /// <summary>
@@ -182,12 +189,14 @@ namespace UnityEditorAssetBrowser
         /// </summary>
         private void OnHierarchyChanged()
         {
+            Helper.DebugLogger.Log("Hierarchy changed. Reloading databases and clearing image cache.");
             // 画像キャッシュをクリア
             ImageServices.Instance.ClearCache();
 
             // データベースを再読み込み
             DatabaseService.LoadAEDatabase();
             DatabaseService.LoadKADatabase();
+            DatabaseService.LoadBOOTHLMDatabase();
             _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
 
             // 現在表示中のアイテムの画像を再読み込み

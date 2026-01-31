@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from Avatar-Explorer(https://github.com/puk06/Avatar-Explorer)
 // Avatar-Explorer is licensed under the MIT License. https://github.com/puk06/Avatar-Explorer/blob/main/LICENSE
 
@@ -13,6 +13,15 @@ using UnityEditorAssetBrowser.Services;
 
 namespace UnityEditorAssetBrowser.Models
 {
+    /// <summary>
+    /// CommonAvatar.json のエントリを表すモデル
+    /// </summary>
+    public sealed class CommonAvatarDefinition
+    {
+        public string Name { get; set; } = "";
+        public List<string> Avatars { get; set; } = new List<string>();
+    }
+
     #region Database Model
     /// <summary>
     /// AvatarExplorerのデータベースモデル
@@ -172,6 +181,11 @@ namespace UnityEditorAssetBrowser.Models
         public DateTime CreatedDate { get; set; } = DateTime.MinValue;
 
         /// <summary>
+        /// 更新日時
+        /// </summary>
+        public DateTime UpdatedDate { get; set; } = DateTime.MinValue;
+
+        /// <summary>
         /// アイテムのタグ
         /// </summary>
         public string[] Tags { get; set; } = Array.Empty<string>();
@@ -203,6 +217,8 @@ namespace UnityEditorAssetBrowser.Models
             => Tags;
         public DateTime GetCreatedDate()
             => TimeZoneInfo.ConvertTimeToUtc(CreatedDate, TimeZoneInfo.Local);
+        public DateTime GetUpdatedDate()
+            => TimeZoneInfo.ConvertTimeToUtc(UpdatedDate, TimeZoneInfo.Local);
 
         /// <summary>
         /// AEアイテムのカテゴリー名を取得
@@ -221,17 +237,17 @@ namespace UnityEditorAssetBrowser.Models
         {
             return itemType switch
             {
-                AvatarExplorerItemType.Avatar => "アバター",
-                AvatarExplorerItemType.Clothing => "衣装",
-                AvatarExplorerItemType.Texture => "テクスチャ",
-                AvatarExplorerItemType.Gimmick => "ギミック",
-                AvatarExplorerItemType.Accessory => "アクセサリー",
-                AvatarExplorerItemType.HairStyle => "髪型",
-                AvatarExplorerItemType.Animation => "アニメーション",
-                AvatarExplorerItemType.Tool => "ツール",
-                AvatarExplorerItemType.Shader => "シェーダー",
+                AvatarExplorerItemType.Avatar => LocalizationService.Instance.GetString("category_avatar"),
+                AvatarExplorerItemType.Clothing => LocalizationService.Instance.GetString("category_clothing"),
+                AvatarExplorerItemType.Texture => LocalizationService.Instance.GetString("category_texture"),
+                AvatarExplorerItemType.Gimmick => LocalizationService.Instance.GetString("category_gimmick"),
+                AvatarExplorerItemType.Accessory => LocalizationService.Instance.GetString("category_accessory"),
+                AvatarExplorerItemType.HairStyle => LocalizationService.Instance.GetString("category_hairstyle"),
+                AvatarExplorerItemType.Animation => LocalizationService.Instance.GetString("category_animation"),
+                AvatarExplorerItemType.Tool => LocalizationService.Instance.GetString("category_tool"),
+                AvatarExplorerItemType.Shader => LocalizationService.Instance.GetString("category_shader"),
                 AvatarExplorerItemType.Custom => CustomCategory,
-                _ => "不明"
+                _ => LocalizationService.Instance.GetString("category_unknown")
             };
         }
     }

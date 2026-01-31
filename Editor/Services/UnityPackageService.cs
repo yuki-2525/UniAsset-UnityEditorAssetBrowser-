@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -9,6 +9,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Networking;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
 {
@@ -21,6 +23,7 @@ namespace UnityEditorAssetBrowser.Services
         private const string PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER = "UnityEditorAssetBrowser_ImportToCategoryFolder";
         private const string PREFS_KEY_GENERATE_FOLDER_THUMBNAIL = "UnityEditorAssetBrowser_GenerateFolderThumbnail";
         private const string PREFS_KEY_SHOW_IMPORT_DIALOG = "UnityEditorAssetBrowser_ShowImportDialog";
+        private const string PREFS_KEY_CATEGORY_FOLDER_NAME_PREFIX = "UnityEditorAssetBrowser_CategoryFolderName_";
 
         /// <summary>
         /// 指定されたディレクトリ内のUnityPackageファイルを検索する
@@ -30,31 +33,34 @@ namespace UnityEditorAssetBrowser.Services
         /// <returns>見つかったUnityPackageファイルのパス配列。ディレクトリが存在しない場合は空の配列を返す</returns>
         public static string[] FindUnityPackages(string directory)
         {
+            DebugLogger.Log($"Finding UnityPackages in: {directory}");
             if (directory == null)
             {
-                Debug.LogError(LocalizationService.Instance.GetString("error_directory_null"));
+                DebugLogger.LogError(LocalizationService.Instance.GetString("error_directory_null"));
                 return Array.Empty<string>();
             }
 
             if (string.IsNullOrEmpty(directory))
             {
-                Debug.LogError(LocalizationService.Instance.GetString("error_directory_empty"));
+                DebugLogger.LogError(LocalizationService.Instance.GetString("error_directory_empty"));
                 return Array.Empty<string>();
             }
 
             if (!Directory.Exists(directory))
             {
-                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_directory_not_found"), directory));
+                // ディレクトリが存在しない場合はエラーとせず空の配列を返す（UI側で警告表示するため）
                 return Array.Empty<string>();
             }
 
             try
             {
-                return Directory.GetFiles(directory, "*.unitypackage", SearchOption.AllDirectories);
+                var files = Directory.GetFiles(directory, "*.unitypackage", SearchOption.AllDirectories);
+                DebugLogger.Log($"Found {files.Length} packages.");
+                return files;
             }
             catch (Exception ex) when (ex is UnauthorizedAccessException || ex is PathTooLongException)
             {
-                Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_search_unitypackage"), ex.Message));
+                DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_search_unitypackage"), ex.Message));
                 return Array.Empty<string>();
             }
         }
@@ -79,8 +85,28 @@ namespace UnityEditorAssetBrowser.Services
             bool generateThumbnail = EditorPrefs.GetBool(PREFS_KEY_GENERATE_FOLDER_THUMBNAIL, true);
             var beforeFolders = generateThumbnail ? GetAssetFolders() : new List<string>();
 
+            string processedImagePath = imagePath;
+            string? tempImagePath = null;
+
+            DebugLogger.Log($"ImportPackageAndSetThumbnails: {packagePath}, GenerateThumbnail: {generateThumbnail}");
+
             try
             {
+                if (generateThumbnail && IsUrl(imagePath))
+                {
+                    try
+                    {
+                        DebugLogger.Log($"Downloading thumbnail from URL: {imagePath}");
+                        processedImagePath = await DownloadAndResizeImageAsync(imagePath);
+                        tempImagePath = processedImagePath;
+                        DebugLogger.Log($"Downloaded to: {tempImagePath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
+                    }
+                }
+
                 bool importToCategoryFolder = forceImportToCategoryFolder ?? EditorPrefs.GetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, false);
                 string pathToImport = packagePath;
                 bool isModified = false;
@@ -89,16 +115,22 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     try
                     {
+                        DebugLogger.Log($"Modifying package structure for category: {category}");
                         // クリーンアップ（前回のゴミがあれば）
                         UnityPackageModifier.Cleanup();
 
+                        // カテゴリフォルダ名の取得（設定があればそれを使用、なければカテゴリ名をそのまま使用）
+                        string folderNameKey = PREFS_KEY_CATEGORY_FOLDER_NAME_PREFIX + category;
+                        string targetFolderName = EditorPrefs.GetString(folderNameKey, category);
+
                         EditorUtility.DisplayProgressBar("Preparing Package", "Modifying package structure...", 0.5f);
-                        pathToImport = await UnityPackageModifier.CreateModifiedPackageAsync(packagePath, category);
+                        pathToImport = await UnityPackageModifier.CreateModifiedPackageAsync(packagePath, targetFolderName);
                         isModified = true;
+                        DebugLogger.Log($"Modified package created at: {pathToImport}");
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_modify_package"), ex.Message));
+                        DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_modify_package"), ex.Message));
                         pathToImport = packagePath;
                         isModified = false;
                     }
@@ -154,7 +186,19 @@ namespace UnityEditorAssetBrowser.Services
                         }
                         catch (Exception ex) 
                         { 
-                            Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_delete_temp_package_failed"), pathToImport, ex.Message));
+                            DebugLogger.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_delete_temp_package_failed"), pathToImport, ex.Message));
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(tempImagePath) && File.Exists(tempImagePath))
+                    {
+                        try
+                        {
+                            File.Delete(tempImagePath);
+                        }
+                        catch (Exception ex)
+                        {
+                            DebugLogger.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
                         }
                     }
                 }
@@ -163,8 +207,6 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     try
                     {
-                        DeleteTempPackage();
-
                         if (generateThumbnail)
                         {
                             // アセットデータベースを更新
@@ -179,20 +221,21 @@ namespace UnityEditorAssetBrowser.Services
                             // サムネイルの設定
                             if (newFolders.Any())
                             {
-                                SetFolderThumbnails(newFolders, imagePath);
+                                SetFolderThumbnails(newFolders, processedImagePath);
                             }
                             else
                             {
-                                Debug.LogWarning(LocalizationService.Instance.GetString("warning_new_folder_not_found"));
+                                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_new_folder_not_found"));
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_post_import_failed"), ex.Message));
+                        DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_post_import_failed"), ex.Message));
                     }
                     finally
                     {
+                        DeleteTempPackage();
                         UnregisterHandlers();
                     }
                 };
@@ -207,7 +250,7 @@ namespace UnityEditorAssetBrowser.Services
                 {
                     DeleteTempPackage();
                     UnregisterHandlers();
-                    Debug.LogError(string.Format(LocalizationService.Instance.GetString("error_import_failed"), error));
+                    DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_import_failed"), error));
                 };
 
                 AssetDatabase.importPackageCompleted += _importCompletedHandler;
@@ -217,7 +260,7 @@ namespace UnityEditorAssetBrowser.Services
             catch (Exception ex)
             {
                 string errorMessage = string.Format(LocalizationService.Instance.GetString("error_package_import_failed"), ex.Message);
-                Debug.LogError(errorMessage);
+                DebugLogger.LogError(errorMessage);
                 onPreImportError?.Invoke(errorMessage);
             }
         }
@@ -249,23 +292,72 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         /// <param name="folders">フォルダパスのリスト</param>
         /// <param name="imagePath">サムネイル画像パス</param>
-        private static void SetFolderThumbnails(List<string> folders, string imagePath)
+        /// <param name="direct">指定されたフォルダに直接設定するかどうか</param>
+        public static async void SetFolderThumbnails(List<string> folders, string imagePath, bool direct = false)
         {
             if (!ValidateInputParameters(folders, imagePath))
                 return;
 
-            string fullImagePath = GetValidatedImagePath(imagePath);
+            string fullImagePath = imagePath;
+            string? tempImagePath = null;
+
+            // URLの場合はダウンロードして一時ファイルを作成
+            if (IsUrl(imagePath))
+            {
+                try
+                {
+                    fullImagePath = await DownloadAndResizeImageAsync(imagePath);
+                    tempImagePath = fullImagePath;
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.LogWarning($"Failed to process thumbnail from URL: {ex.Message}");
+                    return;
+                }
+            }
+            else
+            {
+                fullImagePath = GetValidatedImagePath(imagePath);
+            }
+
             if (string.IsNullOrEmpty(fullImagePath))
                 return;
 
-            var targetFolders = DetermineTargetFolders(folders);
-            if (!targetFolders.Any())
+            try
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_target_folder_not_found"));
-                return;
-            }
+                HashSet<string> targetFolders;
+                if (direct)
+                {
+                    targetFolders = new HashSet<string>(folders);
+                }
+                else
+                {
+                    targetFolders = DetermineTargetFolders(folders);
+                }
 
-            CopyThumbnailsToTargetFolders(targetFolders, fullImagePath);
+                if (!targetFolders.Any())
+                {
+                    DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_target_folder_not_found"));
+                    return;
+                }
+
+                CopyThumbnailsToTargetFolders(targetFolders, fullImagePath);
+            }
+            finally
+            {
+                // 一時ファイルの削除
+                if (!string.IsNullOrEmpty(tempImagePath) && File.Exists(tempImagePath))
+                {
+                    try
+                    {
+                        File.Delete(tempImagePath);
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLogger.LogWarning($"Failed to delete temp thumbnail: {ex.Message}");
+                    }
+                }
+            }
         }
 
         /// <summary>
@@ -275,13 +367,13 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (folders == null || !folders.Any())
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_folder_not_specified"));
+                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_folder_not_specified"));
                 return false;
             }
 
             if (string.IsNullOrEmpty(imagePath))
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_thumbnail_path_not_specified"));
+                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_thumbnail_path_not_specified"));
                 return false;
             }
 
@@ -295,13 +387,13 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (string.IsNullOrEmpty(imagePath))
             {
-                Debug.LogWarning(LocalizationService.Instance.GetString("warning_full_image_path_failed"));
+                DebugLogger.LogWarning(LocalizationService.Instance.GetString("warning_full_image_path_failed"));
                 return string.Empty;
             }
 
             if (!File.Exists(imagePath))
             {
-                Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_not_found"), imagePath));
+                DebugLogger.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_not_found"), imagePath));
                 return string.Empty;
             }
 
@@ -459,6 +551,11 @@ namespace UnityEditorAssetBrowser.Services
             }
         }
 
+        /// <summary>
+        /// 指定されたパスがルートフォルダまたはカテゴリルートフォルダかどうかを判定する
+        /// </summary>
+        /// <param name="path">判定するパス</param>
+        /// <returns>ルートまたはカテゴリルートの場合はtrue</returns>
         private static bool IsRootOrCategoryRoot(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
@@ -490,7 +587,7 @@ namespace UnityEditorAssetBrowser.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_copy_failed"), folder, ex.Message));
+                    DebugLogger.LogWarning(string.Format(LocalizationService.Instance.GetString("warning_thumbnail_copy_failed"), folder, ex.Message));
                 }
             }
 
@@ -556,7 +653,11 @@ namespace UnityEditorAssetBrowser.Services
             return parts.Length == 2 && parts[0] == "Assets" && parts[1] == "FolderIcon.jpg";
         }
 
-        // 複数パスの最も深い共通の親ディレクトリを求める
+        /// <summary>
+        /// 複数のパスに共通する最も深い親ディレクトリを取得する
+        /// </summary>
+        /// <param name="paths">パスのリスト</param>
+        /// <returns>共通の親ディレクトリパス。共通部分がない場合は空文字列</returns>
         private static string GetDeepestCommonParent(IEnumerable<string> paths)
         {
             if (paths == null || !paths.Any()) return string.Empty;
@@ -579,6 +680,87 @@ namespace UnityEditorAssetBrowser.Services
             }
 
             return common.Count > 0 ? string.Join("/", common) : string.Empty;
+        }
+
+        /// <summary>
+        /// 指定されたパスがURLかどうかを判定する
+        /// </summary>
+        /// <param name="path">判定するパス</param>
+        /// <returns>http:// または https:// で始まる場合はtrue</returns>
+        private static bool IsUrl(string path)
+        {
+            return !string.IsNullOrEmpty(path) && (path.StartsWith("http://") || path.StartsWith("https://"));
+        }
+
+        /// <summary>
+        /// URLから画像をダウンロードし、適切なサイズにリサイズして一時ファイルとして保存する
+        /// </summary>
+        /// <param name="url">画像のURL</param>
+        /// <returns>保存された一時ファイルのパス</returns>
+        private static async Task<string> DownloadAndResizeImageAsync(string url)
+        {
+            using (var uwr = UnityWebRequestTexture.GetTexture(url))
+            {
+                var operation = uwr.SendWebRequest();
+                while (!operation.isDone)
+                    await Task.Delay(10);
+
+                if (uwr.result != UnityWebRequest.Result.Success)
+                {
+                    throw new Exception($"Failed to download image: {uwr.error}");
+                }
+
+                Texture2D texture = DownloadHandlerTexture.GetContent(uwr);
+                if (texture == null) throw new Exception("Failed to get texture content");
+
+                try
+                {
+                    // 必要に応じてリサイズ（幅300px基準）
+                    int targetWidth = 300;
+                    int targetHeight = texture.height;
+                    
+                    if (texture.width > targetWidth)
+                    {
+                        float scale = (float)targetWidth / texture.width;
+                        targetHeight = Mathf.RoundToInt(texture.height * scale);
+                    }
+                    else
+                    {
+                        targetWidth = texture.width;
+                    }
+
+                    RenderTexture rt = RenderTexture.GetTemporary(targetWidth, targetHeight, 0);
+                    RenderTexture.active = rt;
+                    Graphics.Blit(texture, rt);
+                    
+                    Texture2D result = new Texture2D(targetWidth, targetHeight, TextureFormat.RGB24, false);
+                    result.ReadPixels(new Rect(0, 0, targetWidth, targetHeight), 0, 0);
+                    result.Apply();
+                    
+                    RenderTexture.active = null;
+                    RenderTexture.ReleaseTemporary(rt);
+
+                    byte[] bytes = result.EncodeToJPG(75);
+                    string tempPath = Path.Combine(Application.temporaryCachePath, "temp_thumbnail_" + Guid.NewGuid() + ".jpg");
+                    File.WriteAllBytes(tempPath, bytes);
+                    
+                    // 生成したテクスチャを解放
+                    if (Application.isPlaying)
+                        UnityEngine.Object.Destroy(result);
+                    else
+                        UnityEngine.Object.DestroyImmediate(result);
+
+                    return tempPath;
+                }
+                finally
+                {
+                    // 元のテクスチャを解放
+                    if (Application.isPlaying)
+                        UnityEngine.Object.Destroy(texture);
+                    else
+                        UnityEngine.Object.DestroyImmediate(texture);
+                }
+            }
         }
 
         [Serializable]

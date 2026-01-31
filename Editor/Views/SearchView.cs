@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 
 #nullable enable
 
@@ -68,6 +68,7 @@ namespace UnityEditorAssetBrowser.Views
             );
             if (newShowAdvancedSearch != _searchViewModel.SearchCriteria.ShowAdvancedSearch)
             {
+                DebugLogger.Log($"Advanced search toggle: {newShowAdvancedSearch}");
                 _searchViewModel.SearchCriteria.ShowAdvancedSearch = newShowAdvancedSearch;
                 _paginationViewModel.ResetPage();
                 GUI.changed = true;
@@ -78,6 +79,7 @@ namespace UnityEditorAssetBrowser.Views
             var clearWidth = GUIStyleManager.Button.CalcSize(new GUIContent(clearLabel)).x + 10;
             if (GUILayout.Button(clearLabel, GUIStyleManager.Button, GUILayout.Width(clearWidth)))
             {
+                DebugLogger.Log("Clear search button clicked");
                 _searchViewModel.ClearSearchCriteria();
                 _paginationViewModel.ResetPage();
                 OnSearchResultChanged();
@@ -90,6 +92,24 @@ namespace UnityEditorAssetBrowser.Views
             if (GUILayout.Button(sortLabel, GUIStyleManager.Button, GUILayout.Width(sortWidth)))
             {
                 var menu = new GenericMenu();
+                menu.AddItem(
+                    new GUIContent(LocalizationService.Instance.GetString("sort_updated_desc")),
+                    _assetBrowserViewModel.CurrentSortMethod
+                        == AssetBrowserViewModel.SortMethod.UpdatedDateDesc,
+                    () =>
+                        _assetBrowserViewModel.SetSortMethod(
+                            AssetBrowserViewModel.SortMethod.UpdatedDateDesc
+                        )
+                );
+                menu.AddItem(
+                    new GUIContent(LocalizationService.Instance.GetString("sort_updated_asc")),
+                    _assetBrowserViewModel.CurrentSortMethod
+                        == AssetBrowserViewModel.SortMethod.UpdatedDateAsc,
+                    () =>
+                        _assetBrowserViewModel.SetSortMethod(
+                            AssetBrowserViewModel.SortMethod.UpdatedDateAsc
+                        )
+                );
                 menu.AddItem(
                     new GUIContent(LocalizationService.Instance.GetString("sort_created_desc")),
                     _assetBrowserViewModel.CurrentSortMethod
@@ -252,7 +272,8 @@ namespace UnityEditorAssetBrowser.Views
                 () => _assetBrowserViewModel.GetFilteredAvatars(),
                 () => _assetBrowserViewModel.GetFilteredItems(),
                 () => _assetBrowserViewModel.GetFilteredWorldObjects(),
-                () => _assetBrowserViewModel.GetFilteredOthers()
+                () => _assetBrowserViewModel.GetFilteredOthers(),
+                () => _assetBrowserViewModel.GetListTabItems()
             );
 
             return totalItems;
@@ -302,6 +323,7 @@ namespace UnityEditorAssetBrowser.Views
                 // データベースを更新
                 DatabaseService.LoadAEDatabase();
                 DatabaseService.LoadKADatabase();
+                DatabaseService.LoadBOOTHLMDatabase();
                 _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
                 _assetItemView.ResetUnitypackageCache();
                 HandleUtility.Repaint();
@@ -341,6 +363,7 @@ namespace UnityEditorAssetBrowser.Views
                 1 => _assetBrowserViewModel.GetFilteredItems(),
                 2 => _assetBrowserViewModel.GetFilteredWorldObjects(),
                 3 => _assetBrowserViewModel.GetFilteredOthers(),
+                4 => _assetBrowserViewModel.GetListTabItems(),
                 _ => new List<IDatabaseItem>()
             };
         }
@@ -351,6 +374,14 @@ namespace UnityEditorAssetBrowser.Views
         private void CheckTabChange()
         {
             int currentTab = _paginationViewModel.SelectedTab;
+
+            // BOOTHLMデータパスが未設定のときはリストタブを無効化してアバタ―タブに戻す
+            bool hasListTab = !string.IsNullOrEmpty(DatabaseService.GetBOOTHLMDataPath());
+            if (!hasListTab && currentTab == 4)
+            {
+                _paginationViewModel.SelectedTab = 0;
+                currentTab = 0;
+            }
 
             // タブが変更された場合
             if (_lastSelectedTab != -1 && _lastSelectedTab != currentTab)

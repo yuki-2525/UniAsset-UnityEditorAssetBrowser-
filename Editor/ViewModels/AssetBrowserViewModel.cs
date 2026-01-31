@@ -1,4 +1,4 @@
-// Copyright (c) 2025 sakurayuki
+// Copyright (c) 2025-2026 sakurayuki
 // This code is borrowed from Avatar-Explorer(https://github.com/puk06/Avatar-Explorer)
 // Avatar-Explorer is licensed under the MIT License. https://github.com/puk06/Avatar-Explorer/blob/main/LICENSE)
 // This code is borrowed from AssetLibraryManager (https://github.com/MAIOTAchannel/AssetLibraryManager)
@@ -14,6 +14,7 @@ using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Models;
 using UnityEditorAssetBrowser.Services;
 using UnityEngine;
+using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.ViewModels
 {
@@ -25,17 +26,27 @@ namespace UnityEditorAssetBrowser.ViewModels
     {
         // イベント定義
         public event Action? SortMethodChanged;
+#pragma warning disable 67
         public event Action<string>? ErrorOccurred;
+#pragma warning restore 67
 
         private AvatarExplorerDatabase? _aeDatabase;
         private KonoAssetAvatarsDatabase? _kaAvatarsDatabase;
         private KonoAssetWearablesDatabase? _kaWearablesDatabase;
         private KonoAssetWorldObjectsDatabase? _kaWorldObjectsDatabase;
         private KonoAssetOtherAssetsDatabase? _kaOtherAssetsDatabase;
+        private BOOTHLMDatabase? _boothlmDatabase;
         private readonly PaginationInfo _paginationInfo;
         private SortMethod _currentSortMethod = SortMethod.CreatedDateDesc;
         private readonly SearchViewModel _searchViewModel;
         private string? _lastError;
+
+        private BOOTHLMList? _currentList;
+        public BOOTHLMList? CurrentList
+        {
+             get => _currentList;
+             set => _currentList = value;
+        }
 
         public string? LastError => _lastError;
 
@@ -47,6 +58,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             KonoAssetWearablesDatabase? kaWearablesDatabase,
             KonoAssetWorldObjectsDatabase? kaWorldObjectsDatabase,
             KonoAssetOtherAssetsDatabase? kaOtherAssetsDatabase,
+            BOOTHLMDatabase? boothlmDatabase,
             PaginationInfo paginationInfo,
             SearchViewModel searchViewModel
         )
@@ -56,9 +68,10 @@ namespace UnityEditorAssetBrowser.ViewModels
             _kaWearablesDatabase = kaWearablesDatabase;
             _kaWorldObjectsDatabase = kaWorldObjectsDatabase;
             _kaOtherAssetsDatabase = kaOtherAssetsDatabase;
+            _boothlmDatabase = boothlmDatabase;
             _paginationInfo = paginationInfo;
             _searchViewModel = searchViewModel;
-            _currentSortMethod = SortMethod.CreatedDateDesc; // デフォルト値を設定
+            _currentSortMethod = SortMethod.UpdatedDateDesc; // デフォルト値を設定
         }
 
         /// <summary>
@@ -66,11 +79,18 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// </summary>
         public void Initialize()
         {
+            DebugLogger.Log("Initializing AssetBrowserViewModel");
             LoadSortMethod();
         }
 
         public enum SortMethod
         {
+            /// <summary>更新日順（新しい順）</summary>
+            UpdatedDateDesc,
+
+            /// <summary>更新日順（古い順）</summary>
+            UpdatedDateAsc,
+
             /// <summary>追加順（新しい順）</summary>
             CreatedDateDesc,
 
@@ -94,6 +114,27 @@ namespace UnityEditorAssetBrowser.ViewModels
 
             /// <summary>BOOTHID順（古い順、小→大）</summary>
             BoothIdAsc,
+        }
+
+        /// <summary>
+        /// BOOTHLMカテゴリのアセットタイプを取得
+        /// </summary>
+        private int GetBOOTHLMAssetType(string category)
+        {
+            var key = "UnityEditorAssetBrowser_BOOTHLMCategoryAssetType_" + category;
+            if (EditorPrefs.HasKey(key))
+            {
+                return EditorPrefs.GetInt(key);
+            }
+
+            // デフォルトの判定ロジック
+            if (category.Contains("3D Characters") || category.Contains("3Dキャラクター") || category.Contains("Avatar") || category.Contains("アバター"))
+                return (int)AssetTypeConstants.Avatar;
+            if (category.Contains("3D Costumes") || category.Contains("3D衣装") || category.Contains("3D Accessories") || category.Contains("3D装飾品") || category.Contains("Fashion") || category.Contains("ファッション"))
+                return (int)AssetTypeConstants.AvatarRelated;
+            if (category.Contains("3D Environments") || category.Contains("3D環境") || category.Contains("World") || category.Contains("ワールド"))
+                return (int)AssetTypeConstants.World;
+            return (int)AssetTypeConstants.Other;
         }
 
         /// <summary>
@@ -127,6 +168,16 @@ namespace UnityEditorAssetBrowser.ViewModels
                 items.AddRange(_kaAvatarsDatabase.Data);
             }
 
+            // BOOTHLMのアバターを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.Avatar
+                    )
+                );
+            }
+
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
         }
 
@@ -154,9 +205,20 @@ namespace UnityEditorAssetBrowser.ViewModels
                 );
             }
             
+            // KAの衣装を追加
             if (_kaWearablesDatabase != null)
             {
                 items.AddRange(_kaWearablesDatabase.Data);
+            }
+
+            // BOOTHLMのアイテムを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.AvatarRelated
+                    )
+                );
             }
 
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
@@ -194,7 +256,54 @@ namespace UnityEditorAssetBrowser.ViewModels
                 items.AddRange(_kaWorldObjectsDatabase.Data);
             }
 
+            // BOOTHLMのワールドオブジェクトを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.World
+                    )
+                );
+            }
+
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
+        }
+
+        private Dictionary<string, (int TotalCount, List<BOOTHLMItem> Items)> _listPreviewCache = new Dictionary<string, (int, List<BOOTHLMItem>)>();
+
+        /// <summary>
+        /// 選択されたリストのアイテムを取得
+        /// </summary>
+        public List<IDatabaseItem> GetListTabItems()
+        {
+            if (_currentList == null) return new List<IDatabaseItem>();
+
+            var items = DatabaseService.GetItemsForBOOTHLMList(_currentList)
+                            .Cast<IDatabaseItem>()
+                            .ToList();
+            
+            return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
+        }
+        
+        /// <summary>
+        /// リストのプレビュー用アイテムを取得（キャッシュあり）
+        /// </summary>
+        public (int TotalCount, List<BOOTHLMItem> Items) GetListPreviewItems(BOOTHLMList list)
+        {
+            string cacheKey = $"{list.Type}_{list.Id}";
+            if (_listPreviewCache.TryGetValue(cacheKey, out var cachedData))
+            {
+                return cachedData;
+            }
+
+            var result = DatabaseService.GetPreviewItemsForBOOTHLMList(list, 5);
+            _listPreviewCache[cacheKey] = result;
+            return result;
+        }
+
+        public void ClearListPreviewCache()
+        {
+            _listPreviewCache.Clear();
         }
 
         /// <summary>
@@ -231,6 +340,16 @@ namespace UnityEditorAssetBrowser.ViewModels
                 items.AddRange(_kaOtherAssetsDatabase.Data);
             }
 
+            // BOOTHLMのその他アセットを追加
+            if (_boothlmDatabase?.Items != null)
+            {
+                items.AddRange(
+                    _boothlmDatabase.Items.Where(item =>
+                        GetBOOTHLMAssetType(item.CategoryName) == (int)AssetTypeConstants.Other
+                    )
+                );
+            }
+
             return SortItems(items.Where(_searchViewModel.IsItemMatchSearch).ToList());
         }
 
@@ -251,6 +370,8 @@ namespace UnityEditorAssetBrowser.ViewModels
                 SortMethod.AuthorDesc => items.OrderByDescending(item => item.GetAuthor()).ToList(),
                 SortMethod.BoothIdDesc => items.OrderByDescending(item => item.GetBoothId()).ToList(),
                 SortMethod.BoothIdAsc => items.OrderBy(item => item.GetBoothId()).ToList(),
+                SortMethod.UpdatedDateDesc => items.OrderByDescending(item => item.GetUpdatedDate()).ToList(),
+                SortMethod.UpdatedDateAsc => items.OrderBy(item => item.GetUpdatedDate()).ToList(),
                 _ => items,
             };
         }
@@ -263,6 +384,7 @@ namespace UnityEditorAssetBrowser.ViewModels
         {
             if (_currentSortMethod != method)
             {
+                DebugLogger.Log($"SortMethod changed: {_currentSortMethod} -> {method}");
                 _currentSortMethod = method;
                 SaveSortMethod();
                 SortMethodChanged?.Invoke();
@@ -274,33 +396,18 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// </summary>
         private void SaveSortMethod()
         {
-            EditorPrefs.SetInt(
-                $"AssetBrowser_SortMethod_{_paginationInfo.SelectedTab}",
-                (int)_currentSortMethod
-            );
+            EditorPrefs.SetInt("UnityEditorAssetBrowser_SortMethod", (int)_currentSortMethod);
         }
 
         /// <summary>
-        /// 保存されたソート方法を読み込む
+        /// ソート方法を読み込む
         /// </summary>
         private void LoadSortMethod()
         {
-            _currentSortMethod = (SortMethod)
-                EditorPrefs.GetInt(
-                    $"AssetBrowser_SortMethod_{_paginationInfo.SelectedTab}",
-                    (int)SortMethod.CreatedDateDesc
-                );
-        }
-
-        /// <summary>
-        /// エラーを処理する
-        /// </summary>
-        /// <param name="message">エラーメッセージ</param>
-        private void HandleError(string message)
-        {
-            _lastError = message;
-            ErrorOccurred?.Invoke(message);
-            Debug.LogError(message);
+            if (EditorPrefs.HasKey("UnityEditorAssetBrowser_SortMethod"))
+            {
+                _currentSortMethod = (SortMethod)EditorPrefs.GetInt("UnityEditorAssetBrowser_SortMethod");
+            }
         }
 
         /// <summary>
@@ -339,9 +446,12 @@ namespace UnityEditorAssetBrowser.ViewModels
             KonoAssetAvatarsDatabase? kaAvatarsDatabase,
             KonoAssetWearablesDatabase? kaWearablesDatabase,
             KonoAssetWorldObjectsDatabase? kaWorldObjectsDatabase,
-            KonoAssetOtherAssetsDatabase? kaOtherAssetsDatabase
+            KonoAssetOtherAssetsDatabase? kaOtherAssetsDatabase,
+            BOOTHLMDatabase? boothlmDatabase
         )
         {
+            DebugLogger.Log("UpdateDatabases called");
+            ClearListPreviewCache();
             // データベースがnullの場合は、即座に更新を完了
             if (
                 aeDatabase == null
@@ -349,6 +459,7 @@ namespace UnityEditorAssetBrowser.ViewModels
                 && kaWearablesDatabase == null
                 && kaWorldObjectsDatabase == null
                 && kaOtherAssetsDatabase == null
+                && boothlmDatabase == null
             )
             {
                 _aeDatabase = null;
@@ -356,6 +467,7 @@ namespace UnityEditorAssetBrowser.ViewModels
                 _kaWearablesDatabase = null;
                 _kaWorldObjectsDatabase = null;
                 _kaOtherAssetsDatabase = null;
+                _boothlmDatabase = null;
                 return;
             }
 
@@ -364,6 +476,8 @@ namespace UnityEditorAssetBrowser.ViewModels
             _kaWearablesDatabase = kaWearablesDatabase;
             _kaWorldObjectsDatabase = kaWorldObjectsDatabase;
             _kaOtherAssetsDatabase = kaOtherAssetsDatabase;
+            _boothlmDatabase = boothlmDatabase;
+            _currentList = null; 
         }
     }
 }
