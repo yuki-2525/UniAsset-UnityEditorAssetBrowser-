@@ -86,7 +86,6 @@ namespace UnityEditorAssetBrowser
             InitializeServices();
             InitializeViewModels();
             InitializeViews();
-            RegisterEventHandlers();
 
             // バージョンチェックを実行
             try
@@ -154,54 +153,17 @@ namespace UnityEditorAssetBrowser
         }
 
         /// <summary>
-        /// イベントハンドラの登録
-        /// </summary>
-        private void RegisterEventHandlers()
-        {
-            EditorApplication.hierarchyChanged += OnHierarchyChanged;
-        }
-
-        /// <summary>
         /// ウィンドウが無効になった時の処理
         /// </summary>
         private void OnDisable()
         {
             LocalizationService.Instance.OnLanguageChanged -= UpdateTitle;
-            UnregisterEventHandlers();
         }
 
         private void UpdateTitle()
         {
             titleContent = new GUIContent(LocalizationService.Instance.GetString("window_title"));
             Repaint();
-        }
-
-        /// <summary>
-        /// イベントハンドラの解除
-        /// </summary>
-        private void UnregisterEventHandlers()
-        {
-            EditorApplication.hierarchyChanged -= OnHierarchyChanged;
-        }
-
-        /// <summary>
-        /// シーン階層が変更された時の処理
-        /// </summary>
-        private void OnHierarchyChanged()
-        {
-            Helper.DebugLogger.Log("Hierarchy changed. Reloading databases and clearing image cache.");
-            // 画像キャッシュをクリア
-            ImageServices.Instance.ClearCache();
-
-            // データベースを再読み込み
-            DatabaseService.LoadAEDatabase();
-            DatabaseService.LoadKADatabase();
-            DatabaseService.LoadBOOTHLMDatabase();
-            _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
-
-            // 現在表示中のアイテムの画像を再読み込み
-            var currentItems = _assetBrowserViewModel.GetCurrentTabItems(_paginationViewModel.SelectedTab);
-            ImageServices.Instance.ReloadCurrentItemsImages(currentItems);
         }
 
         /// <summary>
