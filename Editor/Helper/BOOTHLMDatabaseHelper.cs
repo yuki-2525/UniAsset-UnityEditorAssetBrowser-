@@ -32,9 +32,23 @@ namespace UnityEditorAssetBrowser.Helper
             public string? updated_at { get; set; }
             public bool adult { get; set; }
         }
+        // user_item_infoテーブル用クエリ結果クラス
+        private class UserItemResult
+        {
+            public int id { get; set; }
+            public string name { get; set; } = "";
+            public string shop_name { get; set; } = "";
+            public string? thumbnail_filename { get; set; }
+            public string? category_name { get; set; }
+            public string? description { get; set; }
+            public bool adult { get; set; }
+            public string created_at { get; set; } = "";
+            public string updated_at { get; set; } = "";
+        }
 
         private class TagResult
         {
+            public int booth_item_id { get; set; }
             public string? tag { get; set; }
         }
 
@@ -98,7 +112,7 @@ namespace UnityEditorAssetBrowser.Helper
                 using (var connection = new SQLiteConnection(dbPath, SQLiteOpenFlags.ReadOnly))
                 {
                     DebugLogger.Log("SQLite DB connected.");
-                    
+
                     // リスト情報の取得
                     var normalLists = connection.Query<ListResult>("SELECT id, title, description FROM lists");
                     lists.AddRange(normalLists.Select(l => new BOOTHLMList { Id = l.id, Title = l.title ?? "", Description = l.description ?? "", Type = BOOTHLMListType.Normal }));
@@ -108,13 +122,13 @@ namespace UnityEditorAssetBrowser.Helper
 
                     // アイテム情報の取得クエリ
                     string query = @"
-                        SELECT 
-                            b.id, 
+                        SELECT
+                            b.id,
                             r.id as registered_id,
-                            b.name, 
-                            s.name as shop_name, 
-                            b.thumbnail_url, 
-                            b.description, 
+                            b.name,
+                            s.name as shop_name,
+                            b.thumbnail_url,
+                            b.description,
                             c.name as category_name,
                             r.created_at,
                             r.updated_at,
@@ -126,12 +140,29 @@ namespace UnityEditorAssetBrowser.Helper
 
                     var results = connection.Query<BoothItemResult>(query);
 
+                    // タグを一括取得してDictionaryに変換
+                    var allTags = connection.Query<TagResult>("SELECT booth_item_id, tag FROM booth_item_tag_relations");
+                    var tagsLookup = allTags
+                        .Where(t => !string.IsNullOrEmpty(t.tag))
+                        .GroupBy(t => t.booth_item_id)
+                        .ToDictionary(g => g.Key, g => g.Select(t => t.tag!).ToList());
+
                     foreach (var result in results)
                     {
-                        items.Add(MapResultToItem(result, connection));
+                        items.Add(MapResultToItem(result, tagsLookup));
+                    }
+
+                    // user_item_infoテーブルのデータも取得
+                    var userItemResults = connection.Query<UserItemResult>(@"
+                        SELECT u.*, c.name as category_name
+                        FROM user_item_info u
+                        LEFT JOIN sub_categories c ON u.sub_category = c.id");
+                    foreach (var userItem in userItemResults)
+                    {
+                        items.Add(MapUserItemResultToItem(userItem));
                     }
                 }
-                
+
                 DebugLogger.Log($"Loaded {items.Count} items and {lists.Count} lists from BOOTHLM database.");
                 return new BOOTHLMDatabase(items, lists);
             }
@@ -189,7 +220,7 @@ namespace UnityEditorAssetBrowser.Helper
         {
             public string? registered_id { get; set; }
         }
-        
+
         private class ListItemResult
         {
             public string? item_id { get; set; }
@@ -210,7 +241,7 @@ namespace UnityEditorAssetBrowser.Helper
             string appDataPath = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
             string dbPath = Path.Combine(appDataPath, "pm.booth.library-manager", "data.db");
 
-            if (!File.Exists(dbPath)) 
+            if (!File.Exists(dbPath))
             {
                 DebugLogger.LogError($"DB file not found: {dbPath}");
                 return new List<string>();
@@ -233,7 +264,7 @@ namespace UnityEditorAssetBrowser.Helper
                     else // Smart List
                     {
                          string baseQuery = @"
-                        SELECT 
+                        SELECT
                             r.id as registered_id
                         FROM booth_items b
                         INNER JOIN registered_items r ON b.id = r.booth_item_id
@@ -253,9 +284,9 @@ namespace UnityEditorAssetBrowser.Helper
                             {
                                 // テキスト検索: 商品名 OR 説明 OR URL(サブドメイン) OR ショップ名
                                 whereClause += @" AND (
-                                    b.name LIKE ? OR 
-                                    b.description LIKE ? OR 
-                                    b.shop_subdomain LIKE ? OR 
+                                    b.name LIKE ? OR
+                                    b.description LIKE ? OR
+                                    b.shop_subdomain LIKE ? OR
                                     EXISTS (SELECT 1 FROM shops s WHERE s.subdomain = b.shop_subdomain AND s.name LIKE ?)
                                 )";
                                 string likeText = $"%{criteria.text}%";
@@ -294,10 +325,10 @@ namespace UnityEditorAssetBrowser.Helper
                                 }
                             }
                         }
-                        
+
                         string finalQuery = baseQuery + whereClause;
                         if (limit > 0) finalQuery += $" LIMIT {limit}";
-                        
+
                         var results = connection.Query<RegisteredIdResult>(finalQuery, args.ToArray());
                         ids.AddRange(results.Select(r => r.registered_id ?? "").Where(id => !string.IsNullOrEmpty(id)));
                     }
@@ -362,9 +393,9 @@ namespace UnityEditorAssetBrowser.Helper
                             if (!string.IsNullOrEmpty(criteria.text))
                             {
                                 whereClause += @" AND (
-                                    b.name LIKE ? OR 
-                                    b.description LIKE ? OR 
-                                    b.shop_subdomain LIKE ? OR 
+                                    b.name LIKE ? OR
+                                    b.description LIKE ? OR
+                                    b.shop_subdomain LIKE ? OR
                                     EXISTS (SELECT 1 FROM shops s WHERE s.subdomain = b.shop_subdomain AND s.name LIKE ?)
                                 )";
                                 string likeText = $"%{criteria.text}%";
@@ -401,7 +432,7 @@ namespace UnityEditorAssetBrowser.Helper
                                 }
                             }
                         }
-                        
+
                         string finalQuery = baseQuery + whereClause;
                         count = connection.ExecuteScalar<int>(finalQuery, args.ToArray());
                     }
@@ -418,12 +449,19 @@ namespace UnityEditorAssetBrowser.Helper
             }
         }
 
-        private static BOOTHLMItem MapResultToItem(BoothItemResult result, SQLiteConnection connection)
+        private static BOOTHLMItem MapResultToItem(BoothItemResult result, Dictionary<int, List<string>> tagsLookup)
         {
-            var item = new BOOTHLMItem
+            // booth_items/registered_items由来はb+7桁ゼロ埋め
+            string regId = "";
+            if (!string.IsNullOrEmpty(result.registered_id) && int.TryParse(result.registered_id, out int regNum))
+                regId = $"b{regNum:D7}";
+            else
+                regId = result.registered_id ?? "";
+
+            return new BOOTHLMItem
             {
                 Id = result.id,
-                RegisteredId = result.registered_id ?? "",
+                RegisteredId = regId,
                 Name = result.name ?? "",
                 ShopName = result.shop_name ?? "",
                 ThumbnailUrl = result.thumbnail_url,
@@ -431,20 +469,29 @@ namespace UnityEditorAssetBrowser.Helper
                 CategoryName = result.category_name ?? "不明",
                 CreatedAt = ParseDateTime(result.created_at),
                 UpdatedAt = ParseDateTime(result.updated_at),
-                IsAdult = result.adult
+                IsAdult = result.adult,
+                Tags = tagsLookup.TryGetValue(result.id, out var tags) ? tags : new List<string>()
             };
-            item.Tags = GetTagsForItem(connection, item.Id);
-            return item;
         }
 
-        /// <summary>
-        /// 指定した商品IDに紐づくタグ名リストを取得する
-        /// </summary>
-        private static List<string> GetTagsForItem(SQLiteConnection connection, int boothItemId)
+        // user_item_info → BOOTHLMItem変換
+        private static BOOTHLMItem MapUserItemResultToItem(UserItemResult result)
         {
-            string tagQuery = "SELECT tag FROM booth_item_tag_relations WHERE booth_item_id = ?";
-            var results = connection.Query<TagResult>(tagQuery, boothItemId);
-            return results.Select(r => r.tag ?? "").Where(t => !string.IsNullOrEmpty(t)).ToList();
+            return new BOOTHLMItem
+            {
+                Id = result.id,
+                // RegisteredIdは "u" + 7桁ゼロ埋め
+                RegisteredId = $"u{result.id:D7}",
+                Name = result.name ?? "",
+                ShopName = result.shop_name ?? "",
+                ThumbnailUrl = result.thumbnail_filename, // ファイル名をURLとして扱う場合は要調整
+                Description = result.description,
+                CategoryName = result.category_name ?? "手動追加",
+                CreatedAt = ParseDateTime(result.created_at),
+                UpdatedAt = ParseDateTime(result.updated_at),
+                IsAdult = result.adult,
+                Tags = new List<string>() // 手動追加はタグなし
+            };
         }
 
         /// <summary>
