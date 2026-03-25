@@ -117,12 +117,9 @@ namespace UnityEditorAssetBrowser.Models
         public string Title { get; set; } = "";
 
         /// <summary>
-        /// 作者名
+        /// 作者名（AEV2 JSONの Author フィールド）
         /// </summary>
-        public string AuthorName { get; set; } = "";
-
-        [JsonProperty("Author")]
-        private string AuthorV2 { set { AuthorName = value; } }
+        public string Author { get; set; } = "";
 
         /// <summary>
         /// アイテムのメモ
@@ -135,12 +132,10 @@ namespace UnityEditorAssetBrowser.Models
         public string ItemPath { get; set; } = "";
 
         /// <summary>
-        /// 画像のパス
+        /// サムネイルファイル名（AEV2 JSONの ThumbnailFileName フィールド）
         /// </summary>
-        public string ImagePath { get; set; } = "";
-
         [JsonProperty("ThumbnailFileName")]
-        private string ImagePathV2 { set { ImagePath = value; } }
+        public string ThumbnailFileName { get; set; } = "";
 
         /// <summary>
         /// マテリアルのパス
@@ -148,12 +143,10 @@ namespace UnityEditorAssetBrowser.Models
         public string MaterialPath { get; set; } = "";
 
         /// <summary>
-        /// 対応アバターのリスト
+        /// 対応アバターのリスト（AEV2 JSONの SupportedAvatars フィールド）
         /// </summary>
-        public string[] SupportedAvatar { get; set; } = Array.Empty<string>();
-
         [JsonProperty("SupportedAvatars")]
-        private string[] SupportedAvatarsV2 { set { SupportedAvatar = value; } }
+        public string[] SupportedAvatars { get; set; } = Array.Empty<string>();
 
         /// <summary>
         /// BOOTHのID
@@ -198,7 +191,7 @@ namespace UnityEditorAssetBrowser.Models
         public string GetTitle()
             => Title;
         public string GetAuthor()
-            => AuthorName;
+            => Author;
         public string GetMemo()
             => ItemMemo;
         public string GetItemPath()
@@ -218,10 +211,10 @@ namespace UnityEditorAssetBrowser.Models
         public string GetImagePath()
         {
             var thumbnailDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Avatar Explorer V2", "images", "item_thumbnails");
-            return Path.GetFullPath(Path.Combine(thumbnailDir, ImagePath));
+            return Path.GetFullPath(Path.Combine(thumbnailDir, ThumbnailFileName));
         }
         public string[] GetSupportedAvatars()
-            => SupportedAvatar;
+            => SupportedAvatars;
         public int GetBoothId()
             => BoothId;
         public string GetCategory()
@@ -266,15 +259,19 @@ namespace UnityEditorAssetBrowser.Models
 
         public AvatarExplorerItem ToBaseModel()
         {
+            // V2のパス表現(<sys>やファイル名のみ)をV1互換に正規化して渡す
+            var resolvedItemPath = TryResolvePath(() => GetItemPath(), string.Empty);
+            var resolvedImagePath = TryResolvePath(() => GetImagePath(), string.Empty);
+
             return new AvatarExplorerItem
             {
                 Title = Title,
-                AuthorName = AuthorName,
+                AuthorName = Author,
                 ItemMemo = ItemMemo,
-                ItemPath = ItemPath,
-                ImagePath = ImagePath,
+                ItemPath = resolvedItemPath,
+                ImagePath = resolvedImagePath,
                 MaterialPath = MaterialPath,
-                SupportedAvatar = SupportedAvatar,
+                SupportedAvatar = SupportedAvatars,
                 BoothId = BoothId,
                 Type = Type,
                 CustomCategory = CustomCategory,
@@ -284,6 +281,18 @@ namespace UnityEditorAssetBrowser.Models
                 UpdatedDate = UpdatedDate,
                 Tags = Tags,
             };
+        }
+
+        private static string TryResolvePath(Func<string> resolver, string fallback)
+        {
+            try
+            {
+                return resolver();
+            }
+            catch
+            {
+                return fallback;
+            }
         }
     }
     #endregion

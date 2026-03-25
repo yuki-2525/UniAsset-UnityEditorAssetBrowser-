@@ -73,7 +73,7 @@ namespace UnityEditorAssetBrowser.Helper
                     DebugLogger.Log($"Loaded {v2Items.Length} items from AEV2 database.");
                     foreach (var item in v2Items)
                     {
-                        item.SupportedAvatar = MergeSupportedAvatarsWithCommon(v2Items, item.SupportedAvatar, commonAvatarDefinitions);
+                        item.SupportedAvatars = MergeSupportedAvatarsWithCommon(v2Items, item.SupportedAvatars, commonAvatarDefinitions);
                     }
 
                     var items = v2Items.Select(x => x.ToBaseModel()).ToArray();

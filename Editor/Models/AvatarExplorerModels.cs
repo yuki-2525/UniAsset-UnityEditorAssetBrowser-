@@ -202,23 +202,35 @@ namespace UnityEditorAssetBrowser.Models
             => ItemMemo;
         public string GetItemPath()
         {
-
-            if (ItemPath.StartsWith("Datas\\"))
+            try
             {
-                return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ItemPath.Replace("Datas\\", "")));
-            }
+                if (ItemPath.StartsWith("Datas\\"))
+                {
+                    return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ItemPath.Replace("Datas\\", "")));
+                }
 
-            return Path.GetFullPath(ItemPath);
+                return Path.GetFullPath(ItemPath);
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
         public string GetImagePath()
         {
-
-            if (ImagePath.StartsWith("Datas\\"))
+            try
             {
-                return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ImagePath.Replace("Datas\\", "")));
-            }
+                if (ImagePath.StartsWith("Datas\\"))
+                {
+                    return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ImagePath.Replace("Datas\\", "")));
+                }
 
-            return Path.GetFullPath(ImagePath);
+                return Path.GetFullPath(ImagePath);
+            }
+            catch
+            {
+                return string.Empty;
+            }
         }
         public string[] GetSupportedAvatars()
             => SupportedAvatar;
