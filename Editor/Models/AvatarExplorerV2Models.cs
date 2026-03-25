@@ -134,7 +134,6 @@ namespace UnityEditorAssetBrowser.Models
         /// <summary>
         /// サムネイルファイル名（AEV2 JSONの ThumbnailFileName フィールド）
         /// </summary>
-        [JsonProperty("ThumbnailFileName")]
         public string ThumbnailFileName { get; set; } = "";
 
         /// <summary>
@@ -145,7 +144,6 @@ namespace UnityEditorAssetBrowser.Models
         /// <summary>
         /// 対応アバターのリスト（AEV2 JSONの SupportedAvatars フィールド）
         /// </summary>
-        [JsonProperty("SupportedAvatars")]
         public string[] SupportedAvatars { get; set; } = Array.Empty<string>();
 
         /// <summary>
