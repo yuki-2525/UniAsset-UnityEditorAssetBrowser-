@@ -323,7 +323,7 @@ namespace UnityEditorAssetBrowser.Models
         /// 画像ファイル名
         /// </summary>
         [JsonProperty("imageFileName")]
-        public string ImageFilename { get; set; } = "";
+        public string? ImageFilename { get; set; } = "";
 
         /// <summary>
         /// タグのリスト

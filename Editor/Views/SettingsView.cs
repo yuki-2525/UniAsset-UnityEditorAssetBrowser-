@@ -317,11 +317,31 @@ namespace UnityEditorAssetBrowser.Views
             if (_showDatabaseSettings)
             {
                 EditorGUILayout.BeginVertical(GUIStyleManager.BoxStyle);
-                DrawDatabasePathField(
-                    "AE Database Path:",
-                    DatabaseService.GetAEDatabasePath(),
-                    _onAEDatabasePathChanged
+                
+                // Avatar Explorer V1 Path Input (Manually set)
+                bool aeV2AutoLoad = DatabaseService.IsAEv2PreferencesAutoLoadEnabled();
+                if (!aeV2AutoLoad)
+                {
+                    DrawDatabasePathField(
+                        "AE Database Path:",
+                        DatabaseService.GetAEDatabasePath(),
+                        _onAEDatabasePathChanged
+                    );
+                }
+
+                // Avatar Explorer V2 Checkbox
+                bool newAeV2AutoLoad = EditorGUILayout.ToggleLeft(
+                    "Avatar Explorer V2",
+                    aeV2AutoLoad,
+                    GUIStyleManager.Label
                 );
+
+                if (newAeV2AutoLoad != aeV2AutoLoad)
+                {
+                    DatabaseService.SetAEv2PreferencesAutoLoadEnabled(newAeV2AutoLoad);
+                    InitializeSettingsVisibility();
+                    _showDatabaseSettings = true;
+                }
 
                 bool kaAutoLoad = DatabaseService.IsKAPreferencesAutoLoadEnabled();
                 bool newKaAutoLoad = EditorGUILayout.ToggleLeft(
