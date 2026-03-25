@@ -19,7 +19,7 @@ namespace UnityEditorAssetBrowser.Helper
     /// AEデータベース操作を支援するヘルパークラス
     /// AvatarExplorerのデータベースファイルの読み込み、保存、変換を行う
     /// </summary>
-    public static class AEDatabaseHelper
+    public static class AEV2DatabaseHelper
     {
         /// <summary>
         /// AvatarExplorerのデータベースファイルを読み込む
@@ -33,26 +33,18 @@ namespace UnityEditorAssetBrowser.Helper
             {
                 string jsonPath;
 
-                // AE(V1) は ItemsData.json のみを対象にする
+                // AEV2 は items.json のみを対象にする
                 if (Directory.Exists(path))
                 {
-                    if (path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).EndsWith("Datas", StringComparison.OrdinalIgnoreCase))
+                    var v2Path = Path.Combine(path, "items.json");
+                    if (File.Exists(v2Path))
                     {
-                        jsonPath = Path.Combine(path, "ItemsData.json");
-                        if (!File.Exists(jsonPath))
-                        {
-                            DebugLogger.LogWarning($"AE database file (ItemsData.json) not found in Datas directory: {path}");
-                            return null;
-                        }
+                        jsonPath = v2Path;
                     }
                     else
                     {
-                        jsonPath = Path.Combine(path, "ItemsData.json");
-                        if (!File.Exists(jsonPath))
-                        {
-                            DebugLogger.LogWarning($"AE(V1) database file (ItemsData.json) not found in directory: {path}");
-                            return null;
-                        }
+                        DebugLogger.LogWarning($"AEV2 database file (items.json) not found in directory: {path}");
+                        return null;
                     }
                 }
                 else
@@ -64,8 +56,8 @@ namespace UnityEditorAssetBrowser.Helper
                 DebugLogger.Log($"Reading json file: {jsonPath}");
                 var json = File.ReadAllText(jsonPath);
 
-                // AE(V1) は CommonAvatar.json を使う
-                var commonAvatarPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? string.Empty, "CommonAvatar.json");
+                // AEV2 は commonAvatars.json を使う
+                var commonAvatarPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? string.Empty, "commonAvatars.json");
 
                 var commonAvatarDefinitions = LoadCommonAvatarDefinitions(commonAvatarPath);
 
@@ -75,15 +67,16 @@ namespace UnityEditorAssetBrowser.Helper
                     Converters = new List<JsonConverter> { new CustomDateTimeConverter() },
                 };
 
-                var items = JsonConvert.DeserializeObject<AvatarExplorerItem[]>(json, settings);
-                if (items != null)
+                var v2Items = JsonConvert.DeserializeObject<AvatarExplorerV2Item[]>(json, settings);
+                if (v2Items != null)
                 {
-                    DebugLogger.Log($"Loaded {items.Length} items from AE database.");
-                    foreach (var item in items)
+                    DebugLogger.Log($"Loaded {v2Items.Length} items from AEV2 database.");
+                    foreach (var item in v2Items)
                     {
-                        item.SupportedAvatar = MergeSupportedAvatarsWithCommon(items, item.SupportedAvatar, commonAvatarDefinitions);
+                        item.SupportedAvatar = MergeSupportedAvatarsWithCommon(v2Items, item.SupportedAvatar, commonAvatarDefinitions);
                     }
 
+                    var items = v2Items.Select(x => x.ToBaseModel()).ToArray();
                     return new AvatarExplorerDatabase(items);
                 }
 
@@ -98,34 +91,12 @@ namespace UnityEditorAssetBrowser.Helper
         }
 
         /// <summary>
-        /// AEデータベースを保存する
-        /// </summary>
-        /// <param name="path">保存先のディレクトリパス</param>
-        /// <param name="data">保存するデータ</param>
-        /// <exception cref="Exception">保存に失敗した場合にスローされる</exception>
-        public static void SaveAEDatabase(string path, AvatarExplorerItem[] data)
-        {
-            return; // 勝手に書き換えられたら困るため、一応
-
-            // try
-            // {
-            //     var jsonPath = Path.Combine(path, "ItemsData.json");
-            //     var json = JsonConvert.SerializeObject(data, JsonSettings.Settings);
-            //     File.WriteAllText(jsonPath, json);
-            // }
-            // catch (Exception ex)
-            // {
-            //     Debug.LogWarning($"Error saving AE database: {ex.Message}");
-            // }
-        }
-
-        /// <summary>
         /// 対応アバターのパスをアバター名に変換する
         /// </summary>
         /// <param name="items">全アイテムリスト</param>
         /// <param name="supportedAvatars">変換対象の対応アバターパス配列</param>
         /// <returns>変換後のアバター名配列</returns>
-        private static string[] ConvertSupportedAvatarPaths(AvatarExplorerItem[] items, string[] supportedAvatars)
+        private static string[] ConvertSupportedAvatarPaths(AvatarExplorerV2Item[] items, string[] supportedAvatars)
         {
             var supportedAvatarNames = new List<string>();
 
@@ -141,7 +112,7 @@ namespace UnityEditorAssetBrowser.Helper
         /// <summary>
         /// アバターパスからタイトルを取得する（既存のパス→タイトル変換を再利用し、見つからない場合はパスでフォールバック）
         /// </summary>
-        private static string GetAvatarTitle(AvatarExplorerItem[] items, string avatarPath)
+        private static string GetAvatarTitle(AvatarExplorerV2Item[] items, string avatarPath)
         {
             // 単一要素で既存変換を利用
             var converted = ConvertSupportedAvatarPaths(items, new[] { avatarPath });
@@ -165,9 +136,9 @@ namespace UnityEditorAssetBrowser.Helper
         /// CommonAvatar 定義を考慮して SupportedAvatar をまとめる
         /// </summary>
         private static string[] MergeSupportedAvatarsWithCommon(
-            AvatarExplorerItem[] items,
+            AvatarExplorerV2Item[] items,
             string[] supportedAvatars,
-            IReadOnlyList<CommonAvatarDefinition> commonDefinitions)
+            IReadOnlyList<CommonAvatarV2Definition> commonDefinitions)
         {
             // CommonAvatar が無ければ既存処理で終了
             if (commonDefinitions == null || commonDefinitions.Count == 0)
@@ -232,24 +203,24 @@ namespace UnityEditorAssetBrowser.Helper
         /// <summary>
         /// CommonAvatar.json を読み込む（存在しない場合は空リスト）
         /// </summary>
-        private static IReadOnlyList<CommonAvatarDefinition> LoadCommonAvatarDefinitions(string commonAvatarPath)
+        private static IReadOnlyList<CommonAvatarV2Definition> LoadCommonAvatarDefinitions(string commonAvatarPath)
         {
             if (string.IsNullOrEmpty(commonAvatarPath) || !File.Exists(commonAvatarPath))
             {
                 DebugLogger.Log("CommonAvatar.json not found. Skipping CommonAvatar aggregation.");
-                return Array.Empty<CommonAvatarDefinition>();
+                return Array.Empty<CommonAvatarV2Definition>();
             }
 
             try
             {
                 var json = File.ReadAllText(commonAvatarPath);
-                var data = JsonConvert.DeserializeObject<List<CommonAvatarDefinition>>(json);
-                return data ?? new List<CommonAvatarDefinition>();
+                var data = JsonConvert.DeserializeObject<List<CommonAvatarV2Definition>>(json);
+                return data ?? new List<CommonAvatarV2Definition>();
             }
             catch (Exception ex)
             {
                 DebugLogger.LogWarning($"Failed to load CommonAvatar definitions: {ex.Message}");
-                return Array.Empty<CommonAvatarDefinition>();
+                return Array.Empty<CommonAvatarV2Definition>();
             }
         }
     }

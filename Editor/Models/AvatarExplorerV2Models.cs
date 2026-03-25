@@ -14,9 +14,9 @@ using UnityEditorAssetBrowser.Services;
 namespace UnityEditorAssetBrowser.Models
 {
     /// <summary>
-    /// CommonAvatar.json のエントリを表すモデル
+    /// commonAvatars.json のエントリを表すV2モデル
     /// </summary>
-    public sealed class CommonAvatarDefinition
+    public sealed class CommonAvatarV2Definition
     {
         public string Name { get; set; } = "";
 
@@ -28,34 +28,26 @@ namespace UnityEditorAssetBrowser.Models
 
     #region Database Model
     /// <summary>
-    /// AvatarExplorerのデータベースモデル
-    /// アセットアイテムのリストを管理する
+    /// AvatarExplorer V2のデータベースモデル
     /// </summary>
-    public class AvatarExplorerDatabase
+    public sealed class AvatarExplorerV2Database
     {
-        /// <summary>
-        /// アセットアイテムのリスト
-        /// </summary>
         [JsonProperty("Items")]
-        public List<AvatarExplorerItem> Items { get; set; } = new List<AvatarExplorerItem>();
+        public List<AvatarExplorerV2Item> Items { get; set; } = new List<AvatarExplorerV2Item>();
 
-        /// <summary>
-        /// 配列からデータベースを作成するための変換コンストラクタ
-        /// </summary>
-        /// <param name="items">アイテムの配列</param>
-        public AvatarExplorerDatabase(AvatarExplorerItem[] items)
+        public AvatarExplorerV2Database(AvatarExplorerV2Item[] items)
         {
-            Items = new List<AvatarExplorerItem>(items);
+            Items = new List<AvatarExplorerV2Item>(items);
         }
     }
     #endregion
 
     #region Item Model
     /// <summary>
-    /// AvatarExplorerのアイテムタイプ
+    /// AvatarExplorer V2のアイテムタイプ
     /// アセットの種類を定義する
     /// </summary>
-    public enum AvatarExplorerItemType
+    public enum AvatarExplorerV2ItemType
     {
         /// <summary>
         /// アバター
@@ -114,10 +106,10 @@ namespace UnityEditorAssetBrowser.Models
     }
 
     /// <summary>
-    /// AvatarExplorerのアイテムモデル
+    /// AvatarExplorerV2のアイテムモデル
     /// アセットの詳細情報を管理する
     /// </summary>
-    public class AvatarExplorerItem : IDatabaseItem
+    public class AvatarExplorerV2Item : IDatabaseItem
     {
         /// <summary>
         /// アイテムのタイトル
@@ -128,6 +120,9 @@ namespace UnityEditorAssetBrowser.Models
         /// 作者名
         /// </summary>
         public string AuthorName { get; set; } = "";
+
+        [JsonProperty("Author")]
+        private string AuthorV2 { set { AuthorName = value; } }
 
         /// <summary>
         /// アイテムのメモ
@@ -144,6 +139,9 @@ namespace UnityEditorAssetBrowser.Models
         /// </summary>
         public string ImagePath { get; set; } = "";
 
+        [JsonProperty("ThumbnailFileName")]
+        private string ImagePathV2 { set { ImagePath = value; } }
+
         /// <summary>
         /// マテリアルのパス
         /// </summary>
@@ -153,6 +151,9 @@ namespace UnityEditorAssetBrowser.Models
         /// 対応アバターのリスト
         /// </summary>
         public string[] SupportedAvatar { get; set; } = Array.Empty<string>();
+
+        [JsonProperty("SupportedAvatars")]
+        private string[] SupportedAvatarsV2 { set { SupportedAvatar = value; } }
 
         /// <summary>
         /// BOOTHのID
@@ -202,23 +203,22 @@ namespace UnityEditorAssetBrowser.Models
             => ItemMemo;
         public string GetItemPath()
         {
-
-            if (ItemPath.StartsWith("Datas\\"))
+            if (ItemPath.StartsWith("<sys>"))
             {
-                return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ItemPath.Replace("Datas\\", "")));
+                var root = DatabaseService.GetAEDataRootPath();
+                if (!string.IsNullOrEmpty(root))
+                {
+                    // <sys>で始まっていないものはフルパスと認識する
+                    return Path.GetFullPath(Path.Combine(root, ItemPath.Replace("<sys>", "")));
+                }
             }
 
             return Path.GetFullPath(ItemPath);
         }
         public string GetImagePath()
         {
-
-            if (ImagePath.StartsWith("Datas\\"))
-            {
-                return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ImagePath.Replace("Datas\\", "")));
-            }
-
-            return Path.GetFullPath(ImagePath);
+            var thumbnailDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Avatar Explorer V2", "images", "item_thumbnails");
+            return Path.GetFullPath(Path.Combine(thumbnailDir, ImagePath));
         }
         public string[] GetSupportedAvatars()
             => SupportedAvatar;
@@ -239,28 +239,50 @@ namespace UnityEditorAssetBrowser.Models
         /// </summary>
         /// <returns>アイテムのカテゴリー名</returns>
         public string GetAECategoryName()
-            => GetCategoryNameByType((AvatarExplorerItemType)Type);
+            => GetCategoryNameByType((AvatarExplorerV2ItemType)Type);
 
         /// <summary>
         /// タイプに基づいてカテゴリー名を取得
         /// </summary>
         /// <param name="itemType">アイテムのタイプ</param>
         /// <returns>対応するカテゴリー名</returns>
-        private string GetCategoryNameByType(AvatarExplorerItemType itemType)
+        private string GetCategoryNameByType(AvatarExplorerV2ItemType itemType)
         {
             return itemType switch
             {
-                AvatarExplorerItemType.Avatar => LocalizationService.Instance.GetString("category_avatar"),
-                AvatarExplorerItemType.Clothing => LocalizationService.Instance.GetString("category_clothing"),
-                AvatarExplorerItemType.Texture => LocalizationService.Instance.GetString("category_texture"),
-                AvatarExplorerItemType.Gimmick => LocalizationService.Instance.GetString("category_gimmick"),
-                AvatarExplorerItemType.Accessory => LocalizationService.Instance.GetString("category_accessory"),
-                AvatarExplorerItemType.HairStyle => LocalizationService.Instance.GetString("category_hairstyle"),
-                AvatarExplorerItemType.Animation => LocalizationService.Instance.GetString("category_animation"),
-                AvatarExplorerItemType.Tool => LocalizationService.Instance.GetString("category_tool"),
-                AvatarExplorerItemType.Shader => LocalizationService.Instance.GetString("category_shader"),
-                AvatarExplorerItemType.Custom => CustomCategory,
+                AvatarExplorerV2ItemType.Avatar => LocalizationService.Instance.GetString("category_avatar"),
+                AvatarExplorerV2ItemType.Clothing => LocalizationService.Instance.GetString("category_clothing"),
+                AvatarExplorerV2ItemType.Texture => LocalizationService.Instance.GetString("category_texture"),
+                AvatarExplorerV2ItemType.Gimmick => LocalizationService.Instance.GetString("category_gimmick"),
+                AvatarExplorerV2ItemType.Accessory => LocalizationService.Instance.GetString("category_accessory"),
+                AvatarExplorerV2ItemType.HairStyle => LocalizationService.Instance.GetString("category_hairstyle"),
+                AvatarExplorerV2ItemType.Animation => LocalizationService.Instance.GetString("category_animation"),
+                AvatarExplorerV2ItemType.Tool => LocalizationService.Instance.GetString("category_tool"),
+                AvatarExplorerV2ItemType.Shader => LocalizationService.Instance.GetString("category_shader"),
+                AvatarExplorerV2ItemType.Custom => CustomCategory,
                 _ => LocalizationService.Instance.GetString("category_unknown")
+            };
+        }
+
+        public AvatarExplorerItem ToBaseModel()
+        {
+            return new AvatarExplorerItem
+            {
+                Title = Title,
+                AuthorName = AuthorName,
+                ItemMemo = ItemMemo,
+                ItemPath = ItemPath,
+                ImagePath = ImagePath,
+                MaterialPath = MaterialPath,
+                SupportedAvatar = SupportedAvatar,
+                BoothId = BoothId,
+                Type = Type,
+                CustomCategory = CustomCategory,
+                AuthorId = AuthorId,
+                ThumbnailUrl = ThumbnailUrl,
+                CreatedDate = CreatedDate,
+                UpdatedDate = UpdatedDate,
+                Tags = Tags,
             };
         }
     }

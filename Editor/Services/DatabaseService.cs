@@ -224,7 +224,9 @@ namespace UnityEditorAssetBrowser.Services
 
             if (!string.IsNullOrEmpty(_aeDatabasePath))
             {
-                _aeDatabase = AEDatabaseHelper.LoadAEDatabaseFile(_aeDatabasePath);
+                _aeDatabase = _aeV2UsePrefsPath
+                    ? AEV2DatabaseHelper.LoadAEDatabaseFile(_aeDatabasePath)
+                    : AEDatabaseHelper.LoadAEDatabaseFile(_aeDatabasePath);
                 if (_aeDatabase == null)
                 {
                     OnAEDatabasePathChanged("");

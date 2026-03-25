@@ -374,7 +374,7 @@ namespace UnityEditorAssetBrowser.Helper
                     }
                     else // Smart List
                     {
-                         string baseQuery = @"
+                        string baseQuery = @"
                         SELECT COUNT(*)
                         FROM booth_items b
                         INNER JOIN registered_items r ON b.id = r.booth_item_id
