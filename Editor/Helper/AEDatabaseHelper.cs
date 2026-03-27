@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
 using UnityEditorAssetBrowser.Models;
+using UnityEditorAssetBrowser.Services;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Helper
@@ -30,42 +31,42 @@ namespace UnityEditorAssetBrowser.Helper
             DebugLogger.Log($"Starting to load AE database from: {path}");
             try
             {
-                // パスがディレクトリの場合は、ItemsData.jsonを探す
                 string jsonPath;
+
+                // AE(V1) は ItemsData.json のみを対象にする
                 if (Directory.Exists(path))
                 {
-                    jsonPath = Path.Combine(path, "ItemsData.json");
-                    if (!File.Exists(jsonPath))
+                    if (path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).EndsWith("Datas", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Datasフォルダ内も探す
-                        var datasJsonPath = Path.Combine(path, "Datas", "ItemsData.json");
-                        if (File.Exists(datasJsonPath))
+                        jsonPath = Path.Combine(path, "ItemsData.json");
+                        if (!File.Exists(jsonPath))
                         {
-                            jsonPath = datasJsonPath;
+                            DebugLogger.LogWarning($"AE database file (ItemsData.json) not found in Datas directory: {path}");
+                            return null;
                         }
-                        else
+                    }
+                    else
+                    {
+                        jsonPath = Path.Combine(path, "Datas", "ItemsData.json");
+                        if (!File.Exists(jsonPath))
                         {
-                            DebugLogger.LogWarning($"AE database file not found in directory: {path}");
+                            DebugLogger.LogWarning($"AE(V1) database file (ItemsData.json) not found in directory: {path}");
                             return null;
                         }
                     }
                 }
                 else
                 {
-                    // パスがファイルの場合はそのまま使用
-                    jsonPath = path;
-                    if (!File.Exists(jsonPath))
-                    {
-                        DebugLogger.LogWarning($"AE database file not found at: {jsonPath}");
-                        return null;
-                    }
+                    DebugLogger.LogWarning($"AE database path is not a valid directory: {path}");
+                    return null;
                 }
 
                 DebugLogger.Log($"Reading json file: {jsonPath}");
                 var json = File.ReadAllText(jsonPath);
 
-                // CommonAvatar.json は ItemsData.json と同じディレクトリに置かれている想定
+                // AE(V1) は CommonAvatar.json を使う
                 var commonAvatarPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? string.Empty, "CommonAvatar.json");
+
                 var commonAvatarDefinitions = LoadCommonAvatarDefinitions(commonAvatarPath);
 
                 // JSONシリアライザーの設定
