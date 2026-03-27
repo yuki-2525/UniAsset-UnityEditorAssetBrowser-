@@ -21,6 +21,7 @@ namespace UnityEditorAssetBrowser.Helper
     /// </summary>
     public static class AEV2DatabaseHelper
     {
+        private const string TempAvatarPrefix = "<sys:temp>";
         /// <summary>
         /// AvatarExplorerのデータベースファイルを読み込む
         /// </summary>
@@ -56,10 +57,15 @@ namespace UnityEditorAssetBrowser.Helper
                 DebugLogger.Log($"Reading json file: {jsonPath}");
                 var json = File.ReadAllText(jsonPath);
 
-                // AEV2 は commonAvatars.json を使う
-                var commonAvatarPath = Path.Combine(Path.GetDirectoryName(jsonPath) ?? string.Empty, "commonAvatars.json");
+                var dataDir = Path.GetDirectoryName(jsonPath) ?? string.Empty;
 
+                // AEV2 は commonAvatars.json を使う
+                var commonAvatarPath = Path.Combine(dataDir, "commonAvatars.json");
                 var commonAvatarDefinitions = LoadCommonAvatarDefinitions(commonAvatarPath);
+
+                // tempAvatars.json を読み込む
+                var tempAvatarPath = Path.Combine(dataDir, "tempAvatars.json");
+                var tempAvatarDefinitions = LoadTempAvatarDefinitions(tempAvatarPath);
 
                 // JSONシリアライザーの設定
                 var settings = new JsonSerializerSettings
@@ -73,7 +79,7 @@ namespace UnityEditorAssetBrowser.Helper
                     DebugLogger.Log($"Loaded {v2Items.Length} items from AEV2 database.");
                     foreach (var item in v2Items)
                     {
-                        item.SupportedAvatars = MergeSupportedAvatarsWithCommon(v2Items, item.SupportedAvatars, commonAvatarDefinitions);
+                        item.SupportedAvatars = MergeSupportedAvatarsWithCommon(v2Items, item.SupportedAvatars, commonAvatarDefinitions, tempAvatarDefinitions);
                     }
 
                     var items = v2Items.Select(x => x.ToBaseModel()).ToArray();
@@ -91,45 +97,43 @@ namespace UnityEditorAssetBrowser.Helper
         }
 
         /// <summary>
-        /// 対応アバターのパスをアバター名に変換する
+        /// 対応アバターのIDをアバター名に変換する
         /// </summary>
-        /// <param name="items">全アイテムリスト</param>
-        /// <param name="supportedAvatars">変換対象の対応アバターパス配列</param>
-        /// <returns>変換後のアバター名配列</returns>
-        private static string[] ConvertSupportedAvatarPaths(AvatarExplorerV2Item[] items, string[] supportedAvatars)
+        private static string[] ConvertSupportedAvatarIds(AvatarExplorerV2Item[] items, string[] supportedAvatarIds, IReadOnlyList<TempAvatarV2Definition> tempAvatars)
         {
             var supportedAvatarNames = new List<string>();
 
-            foreach (var avatar in supportedAvatars)
+            foreach (var avatarId in supportedAvatarIds)
             {
-                var avatarData = items.FirstOrDefault(x => x.ItemPath == avatar);
-                if (avatarData != null) supportedAvatarNames.Add(avatarData.Title);
+                var title = GetAvatarTitle(items, tempAvatars, avatarId);
+                // items にも tempAvatars にも見つからない場合はスキップ（IDのまま出力しない）
+                if (title != avatarId) supportedAvatarNames.Add(title);
             }
 
             return supportedAvatarNames.ToArray();
         }
 
         /// <summary>
-        /// アバターパスからタイトルを取得する（既存のパス→タイトル変換を再利用し、見つからない場合はパスでフォールバック）
+        /// アバターIDからタイトルを取得する。
+        /// "&lt;sys:temp&gt;{Id}" 形式の場合は tempAvatars から、それ以外は items から検索する。
+        /// 見つからない場合はIDをそのまま返す。
         /// </summary>
-        private static string GetAvatarTitle(AvatarExplorerV2Item[] items, string avatarPath)
+        private static string GetAvatarTitle(AvatarExplorerV2Item[] items, IReadOnlyList<TempAvatarV2Definition> tempAvatars, string avatarId)
         {
-            // 単一要素で既存変換を利用
-            var converted = ConvertSupportedAvatarPaths(items, new[] { avatarPath });
-            if (converted.Length > 0 && !string.IsNullOrEmpty(converted[0]))
+            if (avatarId.StartsWith(TempAvatarPrefix))
             {
-                return converted[0];
+                var tempId = avatarId[TempAvatarPrefix.Length..];
+                var tempData = tempAvatars.FirstOrDefault(x => x.Id == tempId);
+                if (tempData != null && !string.IsNullOrEmpty(tempData.AvatarName))
+                    return tempData.AvatarName;
+                return avatarId;
             }
 
-            // 念のため直接検索も行う
-            var avatarData = items.FirstOrDefault(x => string.Equals(x.ItemPath, avatarPath, StringComparison.OrdinalIgnoreCase));
+            var avatarData = items.FirstOrDefault(x => x.Id == avatarId);
             if (avatarData != null && !string.IsNullOrEmpty(avatarData.Title))
-            {
                 return avatarData.Title;
-            }
 
-            // 最後のフォールバックはパス
-            return avatarPath;
+            return avatarId;
         }
 
         /// <summary>
@@ -138,24 +142,25 @@ namespace UnityEditorAssetBrowser.Helper
         private static string[] MergeSupportedAvatarsWithCommon(
             AvatarExplorerV2Item[] items,
             string[] supportedAvatars,
-            IReadOnlyList<CommonAvatarV2Definition> commonDefinitions)
+            IReadOnlyList<CommonAvatarV2Definition> commonDefinitions,
+            IReadOnlyList<TempAvatarV2Definition> tempAvatars)
         {
             // CommonAvatar が無ければ既存処理で終了
             if (commonDefinitions == null || commonDefinitions.Count == 0)
             {
-                return ConvertSupportedAvatarPaths(items, supportedAvatars);
+                return ConvertSupportedAvatarIds(items, supportedAvatars, tempAvatars);
             }
 
-            // パス→タイトルのマップ（重複パスは先勝ち）。
+            // ID→タイトルのマップ（重複IDは先勝ち）
             var titleMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var path in supportedAvatars)
+            foreach (var id in supportedAvatars)
             {
-                if (titleMap.ContainsKey(path)) continue;
-                var avatarData = items.FirstOrDefault(x => x.ItemPath == path);
-                if (avatarData != null) titleMap[path] = avatarData.Title;
+                if (titleMap.ContainsKey(id)) continue;
+                var title = GetAvatarTitle(items, tempAvatars, id);
+                if (title != id) titleMap[id] = title;
             }
 
-            var remainingPaths = new HashSet<string>(supportedAvatars, StringComparer.OrdinalIgnoreCase);
+            var remainingIds = new HashSet<string>(supportedAvatars, StringComparer.OrdinalIgnoreCase);
             var merged = new List<string>();
 
             // CommonAvatar を優先的にまとめる（1つでも含まれれば、定義内の全アバター名でまとめる）
@@ -164,40 +169,60 @@ namespace UnityEditorAssetBrowser.Helper
                 if (definition.Avatars == null || definition.Avatars.Count == 0) continue;
 
                 // SupportedAvatar に一つでも含まれるかを判定
-                bool hasAny = definition.Avatars.Any(p => remainingPaths.Contains(p));
+                bool hasAny = definition.Avatars.Any(p => remainingIds.Contains(p));
                 if (!hasAny) continue;
 
-                // 定義内すべてのアバター名を並べる（ConvertSupportedAvatarPaths を使ってパス→名前変換）
+                // 定義内すべてのアバター名を並べる
                 var titles = new List<string>();
-                foreach (var avatarPath in definition.Avatars)
+                foreach (var avatarId in definition.Avatars)
                 {
-                    var title = GetAvatarTitle(items, avatarPath);
-                    titles.Add(title);
+                    titles.Add(GetAvatarTitle(items, tempAvatars, avatarId));
                 }
 
-                // まとめる対象のパスを残余から除外（重複表示を防ぐ）
-                foreach (var avatarPath in definition.Avatars)
+                // まとめる対象のIDを残余から除外（重複表示を防ぐ）
+                foreach (var avatarId in definition.Avatars)
                 {
-                    if (remainingPaths.Contains(avatarPath))
-                    {
-                        remainingPaths.Remove(avatarPath);
-                    }
+                    remainingIds.Remove(avatarId);
                 }
 
                 merged.Add($"{definition.Name}({string.Join(",", titles)})");
             }
 
             // CommonAvatar にまとめられなかったものを個別追加（元の順序を尊重）
-            foreach (var path in supportedAvatars)
+            foreach (var id in supportedAvatars)
             {
-                if (!remainingPaths.Contains(path)) continue;
-                if (titleMap.TryGetValue(path, out var title))
+                if (!remainingIds.Contains(id)) continue;
+                if (titleMap.TryGetValue(id, out var title))
                 {
                     merged.Add(title);
                 }
             }
 
             return merged.ToArray();
+        }
+
+        /// <summary>
+        /// tempAvatars.json を読み込む（存在しない場合は空リスト）
+        /// </summary>
+        private static IReadOnlyList<TempAvatarV2Definition> LoadTempAvatarDefinitions(string tempAvatarPath)
+        {
+            if (string.IsNullOrEmpty(tempAvatarPath) || !File.Exists(tempAvatarPath))
+            {
+                DebugLogger.Log("tempAvatars.json not found. Skipping temp avatar resolution.");
+                return Array.Empty<TempAvatarV2Definition>();
+            }
+
+            try
+            {
+                var json = File.ReadAllText(tempAvatarPath);
+                var data = JsonConvert.DeserializeObject<List<TempAvatarV2Definition>>(json);
+                return data ?? new List<TempAvatarV2Definition>();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogWarning($"Failed to load temp avatar definitions: {ex.Message}");
+                return Array.Empty<TempAvatarV2Definition>();
+            }
         }
 
         /// <summary>

@@ -14,6 +14,16 @@ using UnityEditorAssetBrowser.Services;
 namespace UnityEditorAssetBrowser.Models
 {
     /// <summary>
+    /// tempAvatars.json のエントリを表すV2モデル
+    /// items.json の SupportedAvatars から "&lt;sys:temp&gt;{Id}" 形式で参照される
+    /// </summary>
+    public sealed class TempAvatarV2Definition
+    {
+        public string AvatarName { get; set; } = "";
+        public string Id { get; set; } = "";
+    }
+
+    /// <summary>
     /// commonAvatars.json のエントリを表すV2モデル
     /// </summary>
     public sealed class CommonAvatarV2Definition
@@ -185,6 +195,11 @@ namespace UnityEditorAssetBrowser.Models
         /// アイテムのタグ
         /// </summary>
         public string[] Tags { get; set; } = Array.Empty<string>();
+
+        /// <summary>
+        /// アイテムのID（UUID）
+        /// </summary>
+        public string Id { get; set; } = "";
 
         public string GetTitle()
             => Title;
