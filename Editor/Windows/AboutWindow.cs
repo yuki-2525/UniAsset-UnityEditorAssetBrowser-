@@ -20,7 +20,8 @@ namespace UnityEditorAssetBrowser.Windows
         // 支援者様リスト
         private readonly string[] _supporters = new string[]
         {
-            "シャル様"
+            "シャル様",
+            "色井かんた様"
         };
 
         public static void ShowWindow()
