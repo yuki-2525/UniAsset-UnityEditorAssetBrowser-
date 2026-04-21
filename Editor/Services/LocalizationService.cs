@@ -54,12 +54,14 @@ namespace UnityEditorAssetBrowser.Services
             _localizedText = new Dictionary<string, Dictionary<string, string>>();
 
             var guids = AssetDatabase.FindAssets("LocalizationService t:MonoScript");
-            if (guids.Length == 0)
+            var scriptPath = guids
+                .Select(g => AssetDatabase.GUIDToAssetPath(g))
+                .FirstOrDefault(p => p.Contains("dev.sakurayuki.uniasset") && p.EndsWith("LocalizationService.cs"));
+            if (scriptPath == null)
             {
                 DebugLogger.LogError("LocalizationService script not found.");
                 return;
             }
-            var scriptPath = AssetDatabase.GUIDToAssetPath(guids[0]);
             var editorDir = Path.GetDirectoryName(Path.GetDirectoryName(scriptPath)); // Editor folder
             var localesDir = Path.Combine(editorDir, "_locales");
 
