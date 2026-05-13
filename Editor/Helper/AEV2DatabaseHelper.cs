@@ -56,6 +56,7 @@ namespace UnityEditorAssetBrowser.Helper
 
                 DebugLogger.Log($"Reading json file: {jsonPath}");
                 var json = File.ReadAllText(jsonPath);
+                var appliedMigrationVersion = ReadAppliedMigrationVersion(jsonPath);
 
                 var dataDir = Path.GetDirectoryName(jsonPath) ?? string.Empty;
 
@@ -79,6 +80,7 @@ namespace UnityEditorAssetBrowser.Helper
                     DebugLogger.Log($"Loaded {v2Items.Length} items from AEV2 database.");
                     foreach (var item in v2Items)
                     {
+                        item.Type = NormalizeItemType(item.Type, appliedMigrationVersion);
                         item.SupportedAvatars = MergeSupportedAvatarsWithCommon(v2Items, item.SupportedAvatars, commonAvatarDefinitions, tempAvatarDefinitions);
                     }
 
@@ -95,6 +97,30 @@ namespace UnityEditorAssetBrowser.Helper
                 return null;
             }
         }
+
+        /// <summary>
+        /// items.json.migration.version を読み取る。
+        /// </summary>
+        private static int ReadAppliedMigrationVersion(string filePath)
+        {
+            var versionFilePath = BuildVersionFilePath(filePath);
+            if (!File.Exists(versionFilePath)) return 0;
+
+            var text = File.ReadAllText(versionFilePath).Trim();
+            return int.TryParse(text, out var version) ? version : 0;
+        }
+
+        /// <summary>
+        /// items.json.migration.version の値から、保存時にずれた type を補正する。
+        /// </summary>
+        private static int NormalizeItemType(int type, int appliedMigrationVersion)
+            => appliedMigrationVersion >= 2 ? type - 1 : type;
+
+        /// <summary>
+        /// items.json に対応する migration version ファイルのパスを作る。
+        /// </summary>
+        private static string BuildVersionFilePath(string filePath)
+            => filePath + ".migration.version";
 
         /// <summary>
         /// 対応アバターのIDをアバター名に変換する
