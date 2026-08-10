@@ -36,6 +36,7 @@ namespace UnityEditorAssetBrowser.Helper
         private const int SupportedItemsVersion = 3;
         private const int SupportedCommonAvatarVersion = 1;
         private const int SupportedTempAvatarVersion = 0;
+        private const int ItemTypeMigrationOffset = 1;
 
         private const string ItemPrefix = "item:";
         private const string TempAvatarPrefix = "tempavatar:";
@@ -91,6 +92,10 @@ namespace UnityEditorAssetBrowser.Helper
 
                 foreach (var item in v2Items)
                 {
+                    // Avatar Explorer V2のマイグレーション後のTypeは1始まりだが、
+                    // UniAsset側のカテゴリ enum は0始まりのため正規化する。
+                    item.Category ??= new AvatarExplorerV2Category();
+                    item.Category.Type = NormalizeItemType(item.Category.Type);
                     item.SupportedAvatars = MergeSupportedAvatarsWithCommon(
                         v2Items,
                         item.SupportedAvatars ?? Array.Empty<string>(),
@@ -111,6 +116,9 @@ namespace UnityEditorAssetBrowser.Helper
                 return null;
             }
         }
+
+        private static int NormalizeItemType(int type)
+            => type > 0 ? type - ItemTypeMigrationOffset : 0;
 
         private static T ReadVersionedDatabase<T>(
             string filePath,
