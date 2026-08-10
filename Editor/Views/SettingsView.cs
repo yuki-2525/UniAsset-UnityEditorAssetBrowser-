@@ -34,6 +34,7 @@ namespace UnityEditorAssetBrowser.Views
         private bool _showBOOTHLMCategories;
         private bool _showFolderThumbnailSettings = false;
         private bool _showImportSettings = false;
+        private string _newFileExtension = string.Empty;
         private List<string> _userExcludeFolders;
         private HashSet<string> _enabledDefaultExcludeFolders;
         private string _newExcludeFolder = "";
@@ -817,6 +818,61 @@ namespace UnityEditorAssetBrowser.Views
                 {
                     EditorPrefs.SetBool(PREFS_KEY_IMPORT_TO_CATEGORY_FOLDER, newValue);
                 }
+
+                EditorGUILayout.Space(8);
+                EditorGUILayout.LabelField(
+                    LocalizationService.Instance.GetString("file_extension_settings"),
+                    GUIStyleManager.BoldLabel);
+                EditorGUILayout.HelpBox(
+                    LocalizationService.Instance.GetString("file_extension_settings_help"),
+                    MessageType.Info);
+
+                foreach (string extension in AssetFileExtensionService.GetExtensionsInOrder().ToArray())
+                {
+                    bool enabled = AssetFileExtensionService.IsExtensionEnabled(extension);
+                    EditorGUILayout.BeginHorizontal();
+                    bool newEnabled = EditorGUILayout.ToggleLeft(extension, enabled, GUIStyleManager.Label);
+                    if (newEnabled != enabled)
+                    {
+                        AssetFileExtensionService.SetExtensionEnabled(extension, newEnabled);
+                        OnSettingsChanged?.Invoke();
+                    }
+
+                    int extensionIndex = AssetFileExtensionService.GetExtensionOrderIndex(extension);
+                    EditorGUI.BeginDisabledGroup(extensionIndex <= 0);
+                    if (GUILayout.Button("▲", GUIStyleManager.Button, GUILayout.Width(28)) &&
+                        AssetFileExtensionService.MoveExtension(extension, -1))
+                    {
+                        OnSettingsChanged?.Invoke();
+                    }
+                    EditorGUI.EndDisabledGroup();
+
+                    EditorGUI.BeginDisabledGroup(extensionIndex >= AssetFileExtensionService.GetExtensionsInOrder().Count - 1);
+                    if (GUILayout.Button("▼", GUIStyleManager.Button, GUILayout.Width(28)) &&
+                        AssetFileExtensionService.MoveExtension(extension, 1))
+                    {
+                        OnSettingsChanged?.Invoke();
+                    }
+                    EditorGUI.EndDisabledGroup();
+
+                    if (!AssetFileExtensionService.IsDefaultExtension(extension) &&
+                        GUILayout.Button(LocalizationService.Instance.GetString("remove"), GUIStyleManager.Button, GUILayout.Width(60)))
+                    {
+                        AssetFileExtensionService.RemoveCustomExtension(extension);
+                        OnSettingsChanged?.Invoke();
+                    }
+                    EditorGUILayout.EndHorizontal();
+                }
+
+                EditorGUILayout.BeginHorizontal();
+                _newFileExtension = EditorGUILayout.TextField(_newFileExtension, GUIStyleManager.TextField);
+                if (GUILayout.Button(LocalizationService.Instance.GetString("add"), GUIStyleManager.Button, GUILayout.Width(60)) &&
+                    AssetFileExtensionService.AddCustomExtension(_newFileExtension))
+                {
+                    _newFileExtension = string.Empty;
+                    OnSettingsChanged?.Invoke();
+                }
+                EditorGUILayout.EndHorizontal();
 
                 EditorGUILayout.EndVertical();
             }
