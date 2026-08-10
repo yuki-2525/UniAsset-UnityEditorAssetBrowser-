@@ -611,9 +611,10 @@ namespace UnityEditorAssetBrowser.Services
                     {
                         var json = File.ReadAllText(settingsPath);
                         var settings = JsonUtility.FromJson<AERuntimeSettings>(json);
-                        if (!string.IsNullOrEmpty(settings?.DataRootDirectory))
+                        var dataRootDirectory = settings?.DataRootDirectory;
+                        if (dataRootDirectory != null && dataRootDirectory.Length > 0)
                         {
-                            SetAEDataRootPath(settings.DataRootDirectory);
+                            SetAEDataRootPath(dataRootDirectory);
                         }
                     }
                     catch (Exception ex)

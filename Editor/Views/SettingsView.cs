@@ -827,8 +827,11 @@ namespace UnityEditorAssetBrowser.Views
                     LocalizationService.Instance.GetString("file_extension_settings_help"),
                     MessageType.Info);
 
-                foreach (string extension in AssetFileExtensionService.GetExtensionsInOrder().ToArray())
+                var extensionsInOrder = AssetFileExtensionService.GetExtensionsInOrder();
+                int lastExtensionIndex = extensionsInOrder.Count - 1;
+                for (int i = 0; i < extensionsInOrder.Count; i++)
                 {
+                    string extension = extensionsInOrder[i];
                     bool enabled = AssetFileExtensionService.IsExtensionEnabled(extension);
                     EditorGUILayout.BeginHorizontal();
                     bool newEnabled = EditorGUILayout.ToggleLeft(extension, enabled, GUIStyleManager.Label);
@@ -838,7 +841,7 @@ namespace UnityEditorAssetBrowser.Views
                         OnSettingsChanged?.Invoke();
                     }
 
-                    int extensionIndex = AssetFileExtensionService.GetExtensionOrderIndex(extension);
+                    int extensionIndex = i;
                     EditorGUI.BeginDisabledGroup(extensionIndex <= 0);
                     if (GUILayout.Button("▲", GUIStyleManager.Button, GUILayout.Width(28)) &&
                         AssetFileExtensionService.MoveExtension(extension, -1))
@@ -847,7 +850,7 @@ namespace UnityEditorAssetBrowser.Views
                     }
                     EditorGUI.EndDisabledGroup();
 
-                    EditorGUI.BeginDisabledGroup(extensionIndex >= AssetFileExtensionService.GetExtensionsInOrder().Count - 1);
+                    EditorGUI.BeginDisabledGroup(extensionIndex >= lastExtensionIndex);
                     if (GUILayout.Button("▼", GUIStyleManager.Button, GUILayout.Width(28)) &&
                         AssetFileExtensionService.MoveExtension(extension, 1))
                     {

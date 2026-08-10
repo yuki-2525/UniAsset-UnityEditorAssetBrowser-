@@ -30,6 +30,14 @@ namespace UnityEditorAssetBrowser.Services
             ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tga", ".tif", ".tiff", ".webp", ".psd"
         };
 
+        private static bool _cacheValid;
+        private static string[] _cachedCustomExtensions = Array.Empty<string>();
+        private static string[] _cachedExtensionsInOrder = Array.Empty<string>();
+        private static string[] _cachedSearchExtensions = Array.Empty<string>();
+        private static Dictionary<string, int> _cachedExtensionOrder = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private static Dictionary<string, bool> _cachedExtensionEnabled = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        private static string _cachedConfigurationSignature = string.Empty;
+
         public static IReadOnlyList<string> GetDefaultExtensions() => DefaultExtensions;
 
         public static bool IsDefaultExtensionEnabled(string extension)
@@ -51,8 +59,12 @@ namespace UnityEditorAssetBrowser.Services
         public static bool IsExtensionEnabled(string extension)
         {
             string normalized = NormalizeExtension(extension);
-            return !string.IsNullOrEmpty(normalized) &&
-                EditorPrefs.GetBool(DefaultExtensionPrefsKeyPrefix + normalized, true);
+            if (string.IsNullOrEmpty(normalized)) return false;
+
+            EnsureCache();
+            return _cachedExtensionEnabled.TryGetValue(normalized, out bool enabled)
+                ? enabled
+                : EditorPrefs.GetBool(DefaultExtensionPrefsKeyPrefix + normalized, true);
         }
 
         public static void SetExtensionEnabled(string extension, bool enabled)
@@ -60,16 +72,13 @@ namespace UnityEditorAssetBrowser.Services
             string normalized = NormalizeExtension(extension);
             if (string.IsNullOrEmpty(normalized)) return;
             EditorPrefs.SetBool(DefaultExtensionPrefsKeyPrefix + normalized, enabled);
+            InvalidateCache();
         }
 
         public static IReadOnlyList<string> GetCustomExtensions()
         {
-            return (EditorPrefs.GetString(CustomExtensionsPrefsKey, string.Empty) ?? string.Empty)
-                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(NormalizeExtension)
-                .Where(x => !string.IsNullOrEmpty(x))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
+            EnsureCache();
+            return _cachedCustomExtensions;
         }
 
         public static bool AddCustomExtension(string extension)
@@ -84,6 +93,7 @@ namespace UnityEditorAssetBrowser.Services
 
             extensions.Add(normalized);
             SaveCustomExtensions(extensions);
+            InvalidateCache();
             return true;
         }
 
@@ -92,42 +102,28 @@ namespace UnityEditorAssetBrowser.Services
             string normalized = NormalizeExtension(extension);
             SaveCustomExtensions(GetCustomExtensions()
                 .Where(x => !string.Equals(x, normalized, StringComparison.OrdinalIgnoreCase)));
+            InvalidateCache();
         }
 
         public static IReadOnlyList<string> GetSearchExtensions()
         {
-            return GetExtensionsInOrder()
-                .Where(IsExtensionEnabled)
-                .ToArray();
+            EnsureCache();
+            return _cachedSearchExtensions;
         }
 
         public static IReadOnlyList<string> GetExtensionsInOrder()
         {
-            var available = DefaultExtensions
-                .Concat(GetCustomExtensions())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            var savedOrder = GetSavedOrder();
-            var ordered = savedOrder
-                .Where(extension => available.Contains(extension, StringComparer.OrdinalIgnoreCase))
-                .ToList();
-
-            ordered.AddRange(available.Where(extension =>
-                !ordered.Contains(extension, StringComparer.OrdinalIgnoreCase)));
-            return ordered;
+            EnsureCache();
+            return _cachedExtensionsInOrder;
         }
 
         public static int GetExtensionOrderIndex(string extension)
         {
             string normalized = NormalizeExtension(extension);
-            int index = 0;
-            foreach (string current in GetExtensionsInOrder())
-            {
-                if (string.Equals(current, normalized, StringComparison.OrdinalIgnoreCase)) return index;
-                index++;
-            }
-
-            return int.MaxValue;
+            EnsureCache();
+            return _cachedExtensionOrder.TryGetValue(normalized, out int index)
+                ? index
+                : int.MaxValue;
         }
 
         public static bool MoveExtension(string extension, int direction)
@@ -141,6 +137,7 @@ namespace UnityEditorAssetBrowser.Services
             ordered[index] = ordered[newIndex];
             ordered[newIndex] = moved;
             SaveOrder(ordered);
+            InvalidateCache();
             return true;
         }
 
@@ -149,8 +146,8 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public static string GetConfigurationSignature()
         {
-            return string.Join(";", GetExtensionsInOrder()
-                .Select(extension => $"{extension}={IsExtensionEnabled(extension)}"));
+            EnsureCache();
+            return _cachedConfigurationSignature;
         }
 
         public static string NormalizeExtension(string extension)
@@ -193,7 +190,64 @@ namespace UnityEditorAssetBrowser.Services
                     .Distinct(StringComparer.OrdinalIgnoreCase)));
         }
 
-        private static IReadOnlyList<string> GetSavedOrder()
+        private static void EnsureCache()
+        {
+            if (_cacheValid) return;
+
+            _cachedCustomExtensions = LoadCustomExtensions();
+
+            var available = DefaultExtensions
+                .Concat(_cachedCustomExtensions)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            var availableSet = new HashSet<string>(available, StringComparer.OrdinalIgnoreCase);
+            var ordered = new List<string>();
+            var orderedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string extension in LoadSavedOrder())
+            {
+                if (availableSet.Contains(extension) && orderedSet.Add(extension))
+                    ordered.Add(extension);
+            }
+
+            foreach (string extension in available)
+            {
+                if (orderedSet.Add(extension))
+                    ordered.Add(extension);
+            }
+
+            _cachedExtensionsInOrder = ordered.ToArray();
+            _cachedExtensionOrder = _cachedExtensionsInOrder
+                .Select((extension, index) => new { extension, index })
+                .ToDictionary(x => x.extension, x => x.index, StringComparer.OrdinalIgnoreCase);
+            _cachedExtensionEnabled = _cachedExtensionsInOrder.ToDictionary(
+                extension => extension,
+                extension => EditorPrefs.GetBool(DefaultExtensionPrefsKeyPrefix + extension, true),
+                StringComparer.OrdinalIgnoreCase);
+            _cachedSearchExtensions = _cachedExtensionsInOrder
+                .Where(extension => _cachedExtensionEnabled[extension])
+                .ToArray();
+            _cachedConfigurationSignature = string.Join(";", _cachedExtensionsInOrder
+                .Select(extension => $"{extension}={_cachedExtensionEnabled[extension]}"));
+            _cacheValid = true;
+        }
+
+        private static void InvalidateCache()
+        {
+            _cacheValid = false;
+        }
+
+        private static string[] LoadCustomExtensions()
+        {
+            return (EditorPrefs.GetString(CustomExtensionsPrefsKey, string.Empty) ?? string.Empty)
+                .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(NormalizeExtension)
+                .Where(x => !string.IsNullOrEmpty(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
+        private static string[] LoadSavedOrder()
         {
             return (EditorPrefs.GetString(ExtensionOrderPrefsKey, string.Empty) ?? string.Empty)
                 .Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries)

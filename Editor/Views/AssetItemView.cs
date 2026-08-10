@@ -478,6 +478,33 @@ namespace UnityEditorAssetBrowser.Views
         }
 
         private readonly Dictionary<string, string[]> _cachedUnitypackages = new Dictionary<string, string[]>();
+        private readonly Dictionary<string, FileTypeGroup[]> _cachedFileTypeGroups = new Dictionary<string, FileTypeGroup[]>();
+        private readonly Dictionary<string, PackageDisplayGroups> _cachedPackageDisplayGroups = new Dictionary<string, PackageDisplayGroups>();
+        private string _cachedExtensionConfigurationSignature = string.Empty;
+
+        private sealed class FileTypeGroup
+        {
+            public readonly string TypeKey;
+            public readonly string[] Files;
+
+            public FileTypeGroup(string typeKey, string[] files)
+            {
+                TypeKey = typeKey;
+                Files = files;
+            }
+        }
+
+        private sealed class PackageDisplayGroups
+        {
+            public readonly string[] MaterialPackages;
+            public readonly string[] OtherPackages;
+
+            public PackageDisplayGroups(string[] materialPackages, string[] otherPackages)
+            {
+                MaterialPackages = materialPackages;
+                OtherPackages = otherPackages;
+            }
+        }
 
         /// <summary>
         /// アイテム保存場所にある対応ファイルのセクションを描画
@@ -488,11 +515,20 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="category">カテゴリ</param>
         private void DrawUnityPackageSection(string[] itemPaths, string itemName, string imagePath, string category)
         {
-            string cacheKey = $"{itemName}|{AssetFileExtensionService.GetConfigurationSignature()}";
+            string configurationSignature = AssetFileExtensionService.GetConfigurationSignature();
+            if (!string.Equals(_cachedExtensionConfigurationSignature, configurationSignature, StringComparison.Ordinal))
+            {
+                _cachedUnitypackages.Clear();
+                _cachedFileTypeGroups.Clear();
+                _cachedPackageDisplayGroups.Clear();
+                _cachedExtensionConfigurationSignature = configurationSignature;
+            }
+
+            string cacheKey = $"{itemName}|{configurationSignature}";
             if (!_cachedUnitypackages.TryGetValue(cacheKey, out var unityPackages))
             {
-                unityPackages = (itemPaths ?? Array.Empty<string>())
-                    .SelectMany(path => AssetFileServices.FindFiles(path, AssetFileExtensionService.GetSearchExtensions()))
+                var searchExtensions = AssetFileExtensionService.GetSearchExtensions();
+                unityPackages = AssetFileServices.FindFilesFromPaths(itemPaths ?? Array.Empty<string>(), searchExtensions)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .OrderBy(path => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(path)))
                     .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
@@ -500,16 +536,22 @@ namespace UnityEditorAssetBrowser.Views
                 _cachedUnitypackages.Add(cacheKey, unityPackages);
             }
 
-            if (!unityPackages.Any()) return;
+            if (unityPackages.Length == 0) return;
 
-            var fileGroups = unityPackages
-                .GroupBy(path => AssetFileExtensionService.GetFileTypeKey(Path.GetExtension(path)))
-                .OrderBy(group => group.Min(path => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(path))))
-                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
+            if (!_cachedFileTypeGroups.TryGetValue(cacheKey, out var fileGroups))
+            {
+                fileGroups = unityPackages
+                    .GroupBy(path => AssetFileExtensionService.GetFileTypeKey(Path.GetExtension(path)))
+                    .Select(group => new FileTypeGroup(group.Key, group.ToArray()))
+                    .OrderBy(group => group.Files.Min(path => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(path))))
+                    .ThenBy(group => group.TypeKey, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                _cachedFileTypeGroups[cacheKey] = fileGroups;
+            }
 
             foreach (var fileGroup in fileGroups)
             {
-                DrawFileTypeSection(fileGroup.ToArray(), itemName, imagePath, category, fileGroup.Key);
+                DrawFileTypeSection(fileGroup.Files, itemName, imagePath, category, fileGroup.TypeKey, cacheKey);
             }
         }
 
@@ -521,9 +563,10 @@ namespace UnityEditorAssetBrowser.Views
             string itemName,
             string imagePath,
             string category,
-            string fileTypeKey)
+            string fileTypeKey,
+            string fileCacheKey)
         {
-            if (!unityPackages.Any()) return;
+            if (unityPackages.Length == 0) return;
 
             string foldoutKey = $"{itemName}|{fileTypeKey}";
 
@@ -573,58 +616,9 @@ namespace UnityEditorAssetBrowser.Views
                 {
                     EditorGUI.indentLevel++;
 
-                    // UnityPackageだけの場合は従来のマテリアル分類を維持する。
-                    // 異なる拡張子が混在する場合は、設定した拡張子順を優先する。
-                    bool containsNonUnityPackage = unityPackages.Any(package =>
-                        !string.Equals(Path.GetExtension(package), ".unitypackage", StringComparison.OrdinalIgnoreCase));
-                    var keywords = new[] { "mat", "material", "tex", "texture", "base", "source","共通" };
-                    
-                    var scoredPackages = unityPackages.Select(p => 
-                    {
-                        string fileName = Path.GetFileName(p);
-                        int score = keywords.Sum(k => 
-                        {
-                            int count = 0;
-                            int i = 0;
-                            while ((i = fileName.IndexOf(k, i, StringComparison.OrdinalIgnoreCase)) != -1)
-                            {
-                                i += k.Length;
-                                count++;
-                            }
-                            return count;
-                        });
-                        return new { Package = p, Score = score };
-                    }).ToList();
-
-                    int maxScore = scoredPackages.Any() ? scoredPackages.Max(x => x.Score) : 0;
-
-                    List<string> materialPackages;
-                    List<string> otherPackages;
-
-                    if (!containsNonUnityPackage && maxScore > 0)
-                    {
-                        materialPackages = scoredPackages
-                            .Where(x => x.Score == maxScore)
-                            .Select(x => x.Package)
-                            .ToList();
-                        
-                        otherPackages = scoredPackages
-                            .Where(x => x.Score < maxScore)
-                            .Select(x => x.Package)
-                            .ToList();
-                    }
-                    else
-                    {
-                        materialPackages = new List<string>();
-                        otherPackages = unityPackages.ToList();
-                    }
-
-                    // unityPackages > 2 かつ materialPackages > otherPackages の場合は全てotherPackagesとして処理
-                    if (unityPackages.Count() > 2 && materialPackages.Count > otherPackages.Count)
-                    {
-                        materialPackages.Clear();
-                        otherPackages = unityPackages.ToList();
-                    }
+                    var packageDisplayGroups = GetPackageDisplayGroups(fileCacheKey, fileTypeKey, unityPackages);
+                    string[] materialPackages = packageDisplayGroups.MaterialPackages;
+                    string[] otherPackages = packageDisplayGroups.OtherPackages;
 
                     int lineIndex = 0;
 
@@ -634,11 +628,11 @@ namespace UnityEditorAssetBrowser.Views
                         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                         EditorGUILayout.LabelField(LocalizationService.Instance.GetString("material"), EditorStyles.miniBoldLabel);
 
-                        for (int i = 0; i < materialPackages.Count; i++)
+                        for (int i = 0; i < materialPackages.Length; i++)
                         {
                             DrawItemFile(materialPackages[i], imagePath, category);
 
-                            if (i < materialPackages.Count - 1)
+                            if (i < materialPackages.Length - 1)
                             {
                                 var lineRect = EditorGUILayout.GetControlRect(false, 1);
                                 Color lineColor = LineColors[lineIndex % LineColors.Length];
@@ -655,11 +649,11 @@ namespace UnityEditorAssetBrowser.Views
                     }
 
                     // その他のパッケージの描画
-                    for (int i = 0; i < otherPackages.Count; i++)
+                    for (int i = 0; i < otherPackages.Length; i++)
                     {
                         DrawItemFile(otherPackages[i], imagePath, category);
 
-                        if (i < otherPackages.Count - 1)
+                        if (i < otherPackages.Length - 1)
                         {
                             var lineRect = EditorGUILayout.GetControlRect(false, 1);
                             Color lineColor = LineColors[lineIndex % LineColors.Length];
@@ -675,6 +669,60 @@ namespace UnityEditorAssetBrowser.Views
                 EditorGUILayout.Space(5);
             }
             EditorGUILayout.EndVertical();
+        }
+
+        private PackageDisplayGroups GetPackageDisplayGroups(string fileCacheKey, string fileTypeKey, string[] unityPackages)
+        {
+            if (!string.Equals(fileTypeKey, "unitypackage", StringComparison.OrdinalIgnoreCase))
+                return new PackageDisplayGroups(Array.Empty<string>(), unityPackages);
+
+            string cacheKey = $"{fileCacheKey}|{fileTypeKey}";
+            if (_cachedPackageDisplayGroups.TryGetValue(cacheKey, out var cachedGroups))
+                return cachedGroups;
+
+            var keywords = new[] { "mat", "material", "tex", "texture", "base", "source", "共通" };
+            var scoredPackages = unityPackages.Select(package =>
+            {
+                string fileName = Path.GetFileName(package);
+                int score = keywords.Sum(keyword =>
+                {
+                    int count = 0;
+                    int index = 0;
+                    while ((index = fileName.IndexOf(keyword, index, StringComparison.OrdinalIgnoreCase)) != -1)
+                    {
+                        index += keyword.Length;
+                        count++;
+                    }
+                    return count;
+                });
+                return new { Package = package, Score = score };
+            }).ToList();
+
+            int maxScore = scoredPackages.Count > 0 ? scoredPackages.Max(x => x.Score) : 0;
+            string[] materialPackages = Array.Empty<string>();
+            string[] otherPackages = unityPackages;
+            if (maxScore > 0)
+            {
+                materialPackages = scoredPackages
+                    .Where(x => x.Score == maxScore)
+                    .Select(x => x.Package)
+                    .ToArray();
+                otherPackages = scoredPackages
+                    .Where(x => x.Score < maxScore)
+                    .Select(x => x.Package)
+                    .ToArray();
+            }
+
+            // パッケージ数が多い場合は、マテリアルだけが過半数になる分類を行わない。
+            if (unityPackages.Length > 2 && materialPackages.Length > otherPackages.Length)
+            {
+                materialPackages = Array.Empty<string>();
+                otherPackages = unityPackages;
+            }
+
+            var groups = new PackageDisplayGroups(materialPackages, otherPackages);
+            _cachedPackageDisplayGroups[cacheKey] = groups;
+            return groups;
         }
 
         private string GetFileTypeLabel(string fileTypeKey)
@@ -755,6 +803,10 @@ namespace UnityEditorAssetBrowser.Views
         /// アイテムファイルのキャッシュをリセットします。
         /// </summary>
         public void ResetUnitypackageCache()
-            => _cachedUnitypackages.Clear();
+        {
+            _cachedUnitypackages.Clear();
+            _cachedFileTypeGroups.Clear();
+            _cachedPackageDisplayGroups.Clear();
+        }
     }
 }

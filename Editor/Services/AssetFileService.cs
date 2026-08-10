@@ -18,11 +18,23 @@ namespace UnityEditorAssetBrowser.Services
         {
             if (string.IsNullOrEmpty(path)) return Array.Empty<string>();
 
-            var normalizedExtensions = new HashSet<string>(
-                (extensions ?? Array.Empty<string>())
-                    .Select(AssetFileExtensionService.NormalizeExtension)
-                    .Where(x => !string.IsNullOrEmpty(x)),
-                StringComparer.OrdinalIgnoreCase);
+            return FindFilesInternal(path, NormalizeExtensions(extensions));
+        }
+
+        public static string[] FindFilesFromPaths(IEnumerable<string> paths, IEnumerable<string> extensions)
+        {
+            if (paths == null) return Array.Empty<string>();
+
+            var normalizedExtensions = NormalizeExtensions(extensions);
+            return paths
+                .Where(path => !string.IsNullOrEmpty(path))
+                .SelectMany(path => FindFilesInternal(path, normalizedExtensions))
+                .ToArray();
+        }
+
+        private static string[] FindFilesInternal(string path, HashSet<string> normalizedExtensions)
+        {
+            if (string.IsNullOrEmpty(path)) return Array.Empty<string>();
 
             if (File.Exists(path))
             {
@@ -37,8 +49,6 @@ namespace UnityEditorAssetBrowser.Services
             {
                 return Directory.GetFiles(path, "*", SearchOption.AllDirectories)
                     .Where(file => normalizedExtensions.Contains(Path.GetExtension(file)))
-                    .OrderBy(file => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(file)))
-                    .ThenBy(file => file, StringComparer.OrdinalIgnoreCase)
                     .ToArray();
             }
             catch (UnauthorizedAccessException ex)
@@ -55,6 +65,15 @@ namespace UnityEditorAssetBrowser.Services
             }
 
             return Array.Empty<string>();
+        }
+
+        private static HashSet<string> NormalizeExtensions(IEnumerable<string> extensions)
+        {
+            return new HashSet<string>(
+                (extensions ?? Array.Empty<string>())
+                    .Select(AssetFileExtensionService.NormalizeExtension)
+                    .Where(x => !string.IsNullOrEmpty(x)),
+                StringComparer.OrdinalIgnoreCase);
         }
 
         public static bool CopyToFolder(string sourcePath, string destinationFolder, out string destinationPath)
