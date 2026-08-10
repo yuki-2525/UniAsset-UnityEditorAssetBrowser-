@@ -224,9 +224,22 @@ namespace UnityEditorAssetBrowser.Services
 
             if (!string.IsNullOrEmpty(_aeDatabasePath))
             {
-                _aeDatabase = _aeV2UsePrefsPath
-                    ? AEV2DatabaseHelper.LoadAEDatabaseFile(_aeDatabasePath)
-                    : AEDatabaseHelper.LoadAEDatabaseFile(_aeDatabasePath);
+                try
+                {
+                    _aeDatabase = _aeV2UsePrefsPath
+                        ? AEV2DatabaseHelper.LoadAEDatabaseFile(_aeDatabasePath)
+                        : AEDatabaseHelper.LoadAEDatabaseFile(_aeDatabasePath);
+                }
+                catch (AEV2DatabaseVersionMismatchException ex)
+                {
+                    OnAEDatabasePathChanged("");
+                    ShowErrorDialog(
+                        LocalizationService.Instance.GetString("error_path_title"),
+                        ex.Message
+                    );
+                    return;
+                }
+
                 if (_aeDatabase == null)
                 {
                     OnAEDatabasePathChanged("");

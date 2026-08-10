@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
@@ -140,6 +141,11 @@ namespace UnityEditorAssetBrowser.Models
         public string ItemPath { get; set; } = "";
 
         /// <summary>
+        /// アイテムに紐づく追加の保存場所
+        /// </summary>
+        public string[] ItemPaths { get; set; } = Array.Empty<string>();
+
+        /// <summary>
         /// 画像のパス
         /// </summary>
         public string ImagePath { get; set; } = "";
@@ -202,14 +208,38 @@ namespace UnityEditorAssetBrowser.Models
             => ItemMemo;
         public string GetItemPath()
         {
+            return ResolveItemPath(ItemPath);
+        }
+
+        public string[] GetItemPaths()
+        {
+            var paths = new List<string>();
+
+            AddItemPath(paths, ItemPath);
+            foreach (var itemPath in ItemPaths ?? Array.Empty<string>())
+                AddItemPath(paths, itemPath);
+
+            return paths.ToArray();
+        }
+
+        private static void AddItemPath(List<string> paths, string itemPath)
+        {
+            var resolvedPath = ResolveItemPath(itemPath);
+            if (string.IsNullOrEmpty(resolvedPath)) return;
+            if (!paths.Contains(resolvedPath, StringComparer.OrdinalIgnoreCase))
+                paths.Add(resolvedPath);
+        }
+
+        private static string ResolveItemPath(string itemPath)
+        {
             try
             {
-                if (ItemPath.StartsWith("Datas\\"))
+                if (itemPath.StartsWith("Datas\\"))
                 {
-                    return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ItemPath.Replace("Datas\\", "")));
+                    return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), itemPath.Replace("Datas\\", "")));
                 }
 
-                return Path.GetFullPath(ItemPath);
+                return Path.GetFullPath(itemPath);
             }
             catch
             {

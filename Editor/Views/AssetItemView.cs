@@ -48,7 +48,7 @@ namespace UnityEditorAssetBrowser.Views
             GUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
             DrawItemHeader(item);
-            DrawUnityPackageSection(item.GetItemPath(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
+            DrawUnityPackageSection(item.GetItemPaths(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
 
             GUILayout.EndVertical();
         }
@@ -67,7 +67,7 @@ namespace UnityEditorAssetBrowser.Views
             
             DrawItemBasicInfo(item.GetTitle(), item.GetAuthor());
             DrawItemMetadata(item.GetTitle(), item.GetCategory(), item.GetSupportedAvatars(), item.GetTags(), item.GetMemo());
-            DrawItemActionButtons(item.GetItemPath(), item.GetBoothId(), item.GetImagePath());
+            DrawItemActionButtons(item.GetItemPaths(), item.GetBoothId(), item.GetImagePath());
             
             GUILayout.EndVertical();
 
@@ -108,18 +108,18 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アクションボタン（エクスプローラー・Booth）を描画
         /// </summary>
-        private void DrawItemActionButtons(string itemPath, int boothItemId, string imagePath)
+        private void DrawItemActionButtons(string[] itemPaths, int boothItemId, string imagePath)
         {
             EditorGUILayout.Space(5);
             DrawSetFolderThumbnailButton(imagePath);
-            DrawExplorerOpenButton(itemPath);
+            DrawExplorerOpenButton(itemPaths);
 
             if (boothItemId > 0)
             {
                 DrawBoothOpenButton(boothItemId);
             }
 
-            if (!Directory.Exists(itemPath))
+            if (!(itemPaths ?? Array.Empty<string>()).Any(Directory.Exists))
             {
                 EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("download_data_missing"), MessageType.Info);
             }
@@ -267,10 +267,11 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// "Explorerで開く"ボタンの描画
         /// </summary>
-        /// <param name="itemPath">アイテムパス</param>
-        private void DrawExplorerOpenButton(string itemPath)
+        /// <param name="itemPaths">アイテムの保存場所</param>
+        private void DrawExplorerOpenButton(string[] itemPaths)
         {
-            if (!Directory.Exists(itemPath)) return;
+            var itemPath = (itemPaths ?? Array.Empty<string>()).FirstOrDefault(Directory.Exists);
+            if (string.IsNullOrEmpty(itemPath)) return;
 
             if (GUILayout.Button(LocalizationService.Instance.GetString("open_explorer"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
@@ -481,15 +482,18 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// UnityPackageセクションの描画
         /// </summary>
-        /// <param name="itemPath">アイテムパス</param>
+        /// <param name="itemPaths">アイテムの保存場所</param>
         /// <param name="itemName">アイテム名</param>
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="category">カテゴリ</param>
-        private void DrawUnityPackageSection(string itemPath, string itemName, string imagePath, string category)
+        private void DrawUnityPackageSection(string[] itemPaths, string itemName, string imagePath, string category)
         {
             if (!_cachedUnitypackages.TryGetValue(itemName, out var unityPackages))
             {
-                unityPackages = UnityPackageServices.FindUnityPackages(itemPath);
+                unityPackages = (itemPaths ?? Array.Empty<string>())
+                    .SelectMany(UnityPackageServices.FindUnityPackages)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
                 _cachedUnitypackages.Add(itemName, unityPackages);
             }
 

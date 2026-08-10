@@ -69,6 +69,8 @@ namespace UnityEditorAssetBrowser.Models
             return Path.GetFullPath(Path.Combine(basePath, RegisteredId));
         }
 
+        public string[] GetItemPaths() => new[] { GetItemPath() };
+
         public string GetImagePath()
         {
             // BOOTHLMは画像URLを管理しているため、URLを返す
