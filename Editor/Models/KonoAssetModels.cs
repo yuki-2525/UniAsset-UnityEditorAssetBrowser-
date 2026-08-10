@@ -137,6 +137,7 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Memo ?? "";
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
+        public string[] GetItemPaths() => new[] { GetItemPath() };
         public string GetImagePath()
             => string.IsNullOrEmpty(Description.ImageFilename)
                 ? ""
@@ -181,6 +182,7 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Memo ?? "";
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
+        public string[] GetItemPaths() => new[] { GetItemPath() };
         public string GetImagePath()
             => string.IsNullOrEmpty(Description.ImageFilename)
                 ? ""
@@ -231,6 +233,7 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Memo ?? "";
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
+        public string[] GetItemPaths() => new[] { GetItemPath() };
         public string GetImagePath()
             => string.IsNullOrEmpty(Description.ImageFilename)
                 ? ""
@@ -281,6 +284,7 @@ namespace UnityEditorAssetBrowser.Models
             => Description.Memo ?? "";
         public string GetItemPath()
             => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
+        public string[] GetItemPaths() => new[] { GetItemPath() };
         public string GetImagePath()
             => string.IsNullOrEmpty(Description.ImageFilename)
                 ? ""

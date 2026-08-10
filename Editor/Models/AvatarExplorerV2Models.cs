@@ -7,6 +7,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Newtonsoft.Json;
 using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Services;
@@ -14,8 +15,19 @@ using UnityEditorAssetBrowser.Services;
 namespace UnityEditorAssetBrowser.Models
 {
     /// <summary>
+    /// tempAvatars.json のルートモデル
+    /// </summary>
+    public sealed class TempAvatarV2Database
+    {
+        [JsonProperty("Items")]
+        public List<TempAvatarV2Definition> Items { get; set; } = new List<TempAvatarV2Definition>();
+
+        [JsonProperty("Version")]
+        public int Version { get; set; }
+    }
+
+    /// <summary>
     /// tempAvatars.json のエントリを表すV2モデル
-    /// items.json の SupportedAvatars から "&lt;sys:temp&gt;{Id}" 形式で参照される
     /// </summary>
     public sealed class TempAvatarV2Definition
     {
@@ -28,12 +40,25 @@ namespace UnityEditorAssetBrowser.Models
     /// </summary>
     public sealed class CommonAvatarV2Definition
     {
+        public string Id { get; set; } = "";
         public string Name { get; set; } = "";
 
         [JsonProperty("GroupName")]
         private string GroupName { set { Name = value; } }
 
         public List<string> Avatars { get; set; } = new List<string>();
+    }
+
+    /// <summary>
+    /// commonAvatars.json のルートモデル
+    /// </summary>
+    public sealed class CommonAvatarV2Database
+    {
+        [JsonProperty("Items")]
+        public List<CommonAvatarV2Definition> Items { get; set; } = new List<CommonAvatarV2Definition>();
+
+        [JsonProperty("Version")]
+        public int Version { get; set; }
     }
 
     #region Database Model
@@ -45,6 +70,13 @@ namespace UnityEditorAssetBrowser.Models
         [JsonProperty("Items")]
         public List<AvatarExplorerV2Item> Items { get; set; } = new List<AvatarExplorerV2Item>();
 
+        [JsonProperty("Version")]
+        public int Version { get; set; }
+
+        public AvatarExplorerV2Database()
+        {
+        }
+
         public AvatarExplorerV2Database(AvatarExplorerV2Item[] items)
         {
             Items = new List<AvatarExplorerV2Item>(items);
@@ -55,203 +87,91 @@ namespace UnityEditorAssetBrowser.Models
     #region Item Model
     /// <summary>
     /// AvatarExplorer V2のアイテムタイプ
-    /// アセットの種類を定義する
     /// </summary>
     public enum AvatarExplorerV2ItemType
     {
-        /// <summary>
-        /// アバター
-        /// </summary>
         Avatar,
-
-        /// <summary>
-        /// 衣装
-        /// </summary>
         Clothing,
-
-        /// <summary>
-        /// テクスチャ
-        /// </summary>
         Texture,
-
-        /// <summary>
-        /// ギミック
-        /// </summary>
         Gimmick,
-
-        /// <summary>
-        /// アクセサリー
-        /// </summary>
         Accessory,
-
-        /// <summary>
-        /// 髪型
-        /// </summary>
         HairStyle,
-
-        /// <summary>
-        /// アニメーション
-        /// </summary>
         Animation,
-
-        /// <summary>
-        /// ツール
-        /// </summary>
         Tool,
-
-        /// <summary>
-        /// シェーダー
-        /// </summary>
         Shader,
-
-        /// <summary>
-        /// カスタムカテゴリー
-        /// </summary>
         Custom,
-
-        /// <summary>
-        /// 不明
-        /// </summary>
         Unknown,
     }
 
     /// <summary>
+    /// AvatarExplorer V2のカテゴリー
+    /// </summary>
+    public sealed class AvatarExplorerV2Category
+    {
+        public int Type { get; set; }
+        public string CustomCategory { get; set; } = "";
+    }
+
+    /// <summary>
     /// AvatarExplorerV2のアイテムモデル
-    /// アセットの詳細情報を管理する
     /// </summary>
     public class AvatarExplorerV2Item : IDatabaseItem
     {
-        /// <summary>
-        /// アイテムのタイトル
-        /// </summary>
         public string Title { get; set; } = "";
-
-        /// <summary>
-        /// 作者名（AEV2 JSONの Author フィールド）
-        /// </summary>
         public string Author { get; set; } = "";
-
-        /// <summary>
-        /// アイテムのメモ
-        /// </summary>
         public string ItemMemo { get; set; } = "";
-
-        /// <summary>
-        /// アイテムのパス
-        /// </summary>
         public string ItemPath { get; set; } = "";
-
-        /// <summary>
-        /// サムネイルファイル名（AEV2 JSONの ThumbnailFileName フィールド）
-        /// </summary>
+        public string[] ItemPaths { get; set; } = Array.Empty<string>();
         public string ThumbnailFileName { get; set; } = "";
-
-        /// <summary>
-        /// マテリアルのパス
-        /// </summary>
-        public string MaterialPath { get; set; } = "";
-
-        /// <summary>
-        /// 対応アバターのリスト（AEV2 JSONの SupportedAvatars フィールド）
-        /// </summary>
+        public AvatarExplorerV2Category Category { get; set; } = new AvatarExplorerV2Category();
         public string[] SupportedAvatars { get; set; } = Array.Empty<string>();
-
-        /// <summary>
-        /// BOOTHのID
-        /// </summary>
+        public string[] ImplementedAvatars { get; set; } = Array.Empty<string>();
         public int BoothId { get; set; } = -1;
-
-        /// <summary>
-        /// アイテムのタイプ
-        /// </summary>
-        public int Type { get; set; } = 0;
-
-        /// <summary>
-        /// カスタムカテゴリー
-        /// </summary>
-        public string CustomCategory { get; set; } = "";
-
-        /// <summary>
-        /// 作者のID
-        /// </summary>
         public string AuthorId { get; set; } = "";
-
-        /// <summary>
-        /// サムネイル画像のURL
-        /// </summary>
-        public string ThumbnailUrl { get; set; } = "";
-
-        /// <summary>
-        /// 作成日時
-        /// </summary>
         public DateTime CreatedDate { get; set; } = DateTime.MinValue;
-
-        /// <summary>
-        /// 更新日時
-        /// </summary>
         public DateTime UpdatedDate { get; set; } = DateTime.MinValue;
-
-        /// <summary>
-        /// アイテムのタグ
-        /// </summary>
         public string[] Tags { get; set; } = Array.Empty<string>();
-
-        /// <summary>
-        /// アイテムのID（UUID）
-        /// </summary>
         public string Id { get; set; } = "";
 
-        public string GetTitle()
-            => Title;
-        public string GetAuthor()
-            => Author;
-        public string GetMemo()
-            => ItemMemo;
-        public string GetItemPath()
-        {
-            if (ItemPath.StartsWith("<sys>"))
-            {
-                var root = DatabaseService.GetAEDataRootPath();
-                if (!string.IsNullOrEmpty(root))
-                {
-                    // <sys>で始まっていないものはフルパスと認識する
-                    return Path.GetFullPath(Path.Combine(root, ItemPath.Replace("<sys>", "")));
-                }
-            }
+        // 基底モデルが持つ旧形式の値へ変換するための既定値。
+        public string MaterialPath { get; set; } = "";
+        public string ThumbnailUrl { get; set; } = "";
 
-            return Path.GetFullPath(ItemPath);
+        public string GetTitle() => Title;
+        public string GetAuthor() => Author;
+        public string GetMemo() => ItemMemo;
+        public string GetItemPath() => Path.GetFullPath(ItemPath);
+        public string[] GetItemPaths()
+        {
+            return new[] { ItemPath }
+                .Concat(ItemPaths ?? Array.Empty<string>())
+                .Where(x => !string.IsNullOrEmpty(x))
+                .Select(Path.GetFullPath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
         }
+
         public string GetImagePath()
         {
-            var thumbnailDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Avatar Explorer V2", "images", "item_thumbnails");
+            var thumbnailDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Avatar Explorer V2",
+                "images",
+                "item_thumbnails"
+            );
             return Path.GetFullPath(Path.Combine(thumbnailDir, ThumbnailFileName));
         }
-        public string[] GetSupportedAvatars()
-            => SupportedAvatars;
-        public int GetBoothId()
-            => BoothId;
-        public string GetCategory()
-            => GetAECategoryName();
-        public string[] GetTags()
-            => Tags;
-        public DateTime GetCreatedDate()
-            => TimeZoneInfo.ConvertTimeToUtc(CreatedDate, TimeZoneInfo.Local);
-        public DateTime GetUpdatedDate()
-            => TimeZoneInfo.ConvertTimeToUtc(UpdatedDate, TimeZoneInfo.Local);
 
-        /// <summary>
-        /// AEアイテムのカテゴリー名を取得
-        /// Typeの値に基づいてカテゴリー名を決定する
-        /// </summary>
-        /// <returns>アイテムのカテゴリー名</returns>
+        public string[] GetSupportedAvatars() => SupportedAvatars ?? Array.Empty<string>();
+        public int GetBoothId() => BoothId;
+        public string GetCategory() => GetAECategoryName();
+        public string[] GetTags() => Tags ?? Array.Empty<string>();
+        public DateTime GetCreatedDate() => TimeZoneInfo.ConvertTimeToUtc(CreatedDate, TimeZoneInfo.Local);
+        public DateTime GetUpdatedDate() => TimeZoneInfo.ConvertTimeToUtc(UpdatedDate, TimeZoneInfo.Local);
+
         public string GetAECategoryName()
-            => GetCategoryNameByType((AvatarExplorerV2ItemType)Type);
+            => GetCategoryNameByType((AvatarExplorerV2ItemType)(Category?.Type ?? 0));
 
-        /// <summary>
-        /// タイプに基づいてカテゴリー名を取得
-        /// </summary>
-        /// <param name="itemType">アイテムのタイプ</param>
-        /// <returns>対応するカテゴリー名</returns>
         private string GetCategoryNameByType(AvatarExplorerV2ItemType itemType)
         {
             return itemType switch
@@ -265,16 +185,15 @@ namespace UnityEditorAssetBrowser.Models
                 AvatarExplorerV2ItemType.Animation => LocalizationService.Instance.GetString("category_animation"),
                 AvatarExplorerV2ItemType.Tool => LocalizationService.Instance.GetString("category_tool"),
                 AvatarExplorerV2ItemType.Shader => LocalizationService.Instance.GetString("category_shader"),
-                AvatarExplorerV2ItemType.Custom => CustomCategory,
+                AvatarExplorerV2ItemType.Custom => Category?.CustomCategory ?? "",
                 _ => LocalizationService.Instance.GetString("category_unknown")
             };
         }
 
         public AvatarExplorerItem ToBaseModel()
         {
-            // V2のパス表現(<sys>やファイル名のみ)をV1互換に正規化して渡す
-            var resolvedItemPath = TryResolvePath(() => GetItemPath(), string.Empty);
-            var resolvedImagePath = TryResolvePath(() => GetImagePath(), string.Empty);
+            var resolvedItemPath = TryResolvePath(GetItemPath, string.Empty);
+            var resolvedImagePath = TryResolvePath(GetImagePath, string.Empty);
 
             return new AvatarExplorerItem
             {
@@ -282,17 +201,22 @@ namespace UnityEditorAssetBrowser.Models
                 AuthorName = Author,
                 ItemMemo = ItemMemo,
                 ItemPath = resolvedItemPath,
+                ItemPaths = (ItemPaths ?? Array.Empty<string>())
+                    .Select(path => TryResolvePath(() => Path.GetFullPath(path), string.Empty))
+                    .Where(path => !string.IsNullOrEmpty(path))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
                 ImagePath = resolvedImagePath,
                 MaterialPath = MaterialPath,
-                SupportedAvatar = SupportedAvatars,
+                SupportedAvatar = SupportedAvatars ?? Array.Empty<string>(),
                 BoothId = BoothId,
-                Type = Type,
-                CustomCategory = CustomCategory,
+                Type = Category?.Type ?? 0,
+                CustomCategory = Category?.CustomCategory ?? "",
                 AuthorId = AuthorId,
                 ThumbnailUrl = ThumbnailUrl,
                 CreatedDate = CreatedDate,
                 UpdatedDate = UpdatedDate,
-                Tags = Tags,
+                Tags = Tags ?? Array.Empty<string>(),
             };
         }
 

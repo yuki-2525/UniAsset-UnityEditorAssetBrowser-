@@ -35,6 +35,12 @@ namespace UnityEditorAssetBrowser.Interfaces
         public string GetItemPath();
 
         /// <summary>
+        /// アイテムの保存場所をすべて取得します。主パスを含みます。
+        /// </summary>
+        /// <returns>アイテムの保存場所のフルパス配列</returns>
+        public string[] GetItemPaths();
+
+        /// <summary>
         /// アイテムのサムネイルのフルパスを取得します
         /// </summary>
         /// <returns></returns>

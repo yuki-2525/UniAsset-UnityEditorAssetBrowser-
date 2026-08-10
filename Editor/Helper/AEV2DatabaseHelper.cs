@@ -9,87 +9,106 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEditorAssetBrowser.Models;
 using UnityEditorAssetBrowser.Services;
-using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Helper
 {
     /// <summary>
-    /// AEデータベース操作を支援するヘルパークラス
-    /// AvatarExplorerのデータベースファイルの読み込み、保存、変換を行う
+    /// AEデータベースのバージョンが対応範囲外であることを表す例外
+    /// </summary>
+    public sealed class AEV2DatabaseVersionMismatchException : Exception
+    {
+        public AEV2DatabaseVersionMismatchException()
+            : base(AEV2DatabaseHelper.VersionMismatchMessage)
+        {
+        }
+    }
+
+    /// <summary>
+    /// AvatarExplorer V2のデータベース読み込みを支援するヘルパークラス
     /// </summary>
     public static class AEV2DatabaseHelper
     {
-        private const string TempAvatarPrefix = "<sys:temp>";
+        public const string VersionMismatchMessage = "ゆにあせとAvatarExplorerを最新版にアップデートしてください";
+
+        private const int SupportedItemsVersion = 3;
+        private const int SupportedCommonAvatarVersion = 1;
+        private const int SupportedTempAvatarVersion = 0;
+        private const int ItemTypeMigrationOffset = 1;
+
+        private const string ItemPrefix = "item:";
+        private const string TempAvatarPrefix = "tempavatar:";
+        private const string CommonAvatarPrefix = "commonavatar:";
+
         /// <summary>
-        /// AvatarExplorerのデータベースファイルを読み込む
+        /// AvatarExplorer V2のデータベースファイルを読み込む
         /// </summary>
-        /// <param name="path">データベースのパス（ディレクトリまたはファイルパス）</param>
+        /// <param name="path">データベースディレクトリ</param>
         /// <returns>読み込んだデータベース。読み込みに失敗した場合はnull</returns>
         public static AvatarExplorerDatabase? LoadAEDatabaseFile(string path)
         {
             DebugLogger.Log($"Starting to load AE database from: {path}");
+
             try
             {
-                string jsonPath;
-
-                // AEV2 は items.json のみを対象にする
-                if (Directory.Exists(path))
-                {
-                    var v2Path = Path.Combine(path, "items.json");
-                    if (File.Exists(v2Path))
-                    {
-                        jsonPath = v2Path;
-                    }
-                    else
-                    {
-                        DebugLogger.LogWarning($"AEV2 database file (items.json) not found in directory: {path}");
-                        return null;
-                    }
-                }
-                else
+                if (!Directory.Exists(path))
                 {
                     DebugLogger.LogWarning($"AE database path is not a valid directory: {path}");
                     return null;
                 }
 
-                DebugLogger.Log($"Reading json file: {jsonPath}");
-                var json = File.ReadAllText(jsonPath);
-                var appliedMigrationVersion = ReadAppliedMigrationVersion(jsonPath);
+                var dataDir = path;
+                var itemsPath = Path.Combine(dataDir, "items.json");
+                if (!File.Exists(itemsPath))
+                {
+                    DebugLogger.LogWarning($"AEV2 database file (items.json) not found in directory: {path}");
+                    return null;
+                }
 
-                var dataDir = Path.GetDirectoryName(jsonPath) ?? string.Empty;
-
-                // AEV2 は commonAvatars.json を使う
-                var commonAvatarPath = Path.Combine(dataDir, "commonAvatars.json");
-                var commonAvatarDefinitions = LoadCommonAvatarDefinitions(commonAvatarPath);
-
-                // tempAvatars.json を読み込む
-                var tempAvatarPath = Path.Combine(dataDir, "tempAvatars.json");
-                var tempAvatarDefinitions = LoadTempAvatarDefinitions(tempAvatarPath);
-
-                // JSONシリアライザーの設定
                 var settings = new JsonSerializerSettings
                 {
                     Converters = new List<JsonConverter> { new CustomDateTimeConverter() },
                 };
 
-                var v2Items = JsonConvert.DeserializeObject<AvatarExplorerV2Item[]>(json, settings);
-                if (v2Items != null)
-                {
-                    DebugLogger.Log($"Loaded {v2Items.Length} items from AEV2 database.");
-                    foreach (var item in v2Items)
-                    {
-                        item.Type = NormalizeItemType(item.Type, appliedMigrationVersion);
-                        item.SupportedAvatars = MergeSupportedAvatarsWithCommon(v2Items, item.SupportedAvatars, commonAvatarDefinitions, tempAvatarDefinitions);
-                    }
+                var v2Database = ReadVersionedDatabase<AvatarExplorerV2Database>(
+                    itemsPath,
+                    SupportedItemsVersion,
+                    settings
+                );
 
-                    var items = v2Items.Select(x => x.ToBaseModel()).ToArray();
-                    return new AvatarExplorerDatabase(items);
+                var commonAvatarDefinitions = LoadCommonAvatarDefinitions(
+                    Path.Combine(dataDir, "commonAvatars.json"),
+                    settings
+                );
+                var tempAvatarDefinitions = LoadTempAvatarDefinitions(
+                    Path.Combine(dataDir, "tempAvatars.json"),
+                    settings
+                );
+
+                var v2Items = (v2Database.Items ?? new List<AvatarExplorerV2Item>()).ToArray();
+                DebugLogger.Log($"Loaded {v2Items.Length} items from AEV2 database.");
+
+                foreach (var item in v2Items)
+                {
+                    // Avatar Explorer V2のマイグレーション後のTypeは1始まりだが、
+                    // UniAsset側のカテゴリ enum は0始まりのため正規化する。
+                    item.Category ??= new AvatarExplorerV2Category();
+                    item.Category.Type = NormalizeItemType(item.Category.Type);
+                    item.SupportedAvatars = MergeSupportedAvatarsWithCommon(
+                        v2Items,
+                        item.SupportedAvatars ?? Array.Empty<string>(),
+                        commonAvatarDefinitions,
+                        tempAvatarDefinitions
+                    );
                 }
 
-                DebugLogger.LogWarning("Deserialized items structure is null.");
-                return null;
+                return new AvatarExplorerDatabase(v2Items.Select(x => x.ToBaseModel()).ToArray());
+            }
+            catch (AEV2DatabaseVersionMismatchException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -98,181 +117,170 @@ namespace UnityEditorAssetBrowser.Helper
             }
         }
 
-        /// <summary>
-        /// items.json.migration.version を読み取る。
-        /// </summary>
-        private static int ReadAppliedMigrationVersion(string filePath)
-        {
-            var versionFilePath = BuildVersionFilePath(filePath);
-            if (!File.Exists(versionFilePath)) return 0;
+        private static int NormalizeItemType(int type)
+            => type > 0 ? type - ItemTypeMigrationOffset : 0;
 
-            var text = File.ReadAllText(versionFilePath).Trim();
-            return int.TryParse(text, out var version) ? version : 0;
+        private static T ReadVersionedDatabase<T>(
+            string filePath,
+            int supportedVersion,
+            JsonSerializerSettings settings
+        ) where T : class
+        {
+            var root = JToken.Parse(File.ReadAllText(filePath)) as JObject;
+            if (root == null || root["Items"] is not JArray)
+                throw new AEV2DatabaseVersionMismatchException();
+
+            var version = root["Version"];
+            if (version == null || version.Type != JTokenType.Integer || version.Value<int>() != supportedVersion)
+                throw new AEV2DatabaseVersionMismatchException();
+
+            var database = root.ToObject<T>(JsonSerializer.Create(settings));
+            if (database == null)
+                throw new AEV2DatabaseVersionMismatchException();
+
+            return database;
         }
 
-        /// <summary>
-        /// items.json.migration.version の値から、保存時にずれた type を補正する。
-        /// </summary>
-        private static int NormalizeItemType(int type, int appliedMigrationVersion)
-            => appliedMigrationVersion >= 2 ? type - 1 : type;
-
-        /// <summary>
-        /// items.json に対応する migration version ファイルのパスを作る。
-        /// </summary>
-        private static string BuildVersionFilePath(string filePath)
-            => filePath + ".migration.version";
-
-        /// <summary>
-        /// 対応アバターのIDをアバター名に変換する
-        /// </summary>
-        private static string[] ConvertSupportedAvatarIds(AvatarExplorerV2Item[] items, string[] supportedAvatarIds, IReadOnlyList<TempAvatarV2Definition> tempAvatars)
+        private static string[] ConvertSupportedAvatarIds(
+            AvatarExplorerV2Item[] items,
+            string[] supportedAvatarReferences,
+            IReadOnlyList<TempAvatarV2Definition> tempAvatars
+        )
         {
             var supportedAvatarNames = new List<string>();
 
-            foreach (var avatarId in supportedAvatarIds)
+            foreach (var avatarReference in supportedAvatarReferences)
             {
-                var title = GetAvatarTitle(items, tempAvatars, avatarId);
-                // items にも tempAvatars にも見つからない場合はスキップ（IDのまま出力しない）
-                if (title != avatarId) supportedAvatarNames.Add(title);
+                if (TryGetAvatarTitle(items, tempAvatars, avatarReference, out var title))
+                    supportedAvatarNames.Add(title);
             }
 
             return supportedAvatarNames.ToArray();
         }
 
-        /// <summary>
-        /// アバターIDからタイトルを取得する。
-        /// "&lt;sys:temp&gt;{Id}" 形式の場合は tempAvatars から、それ以外は items から検索する。
-        /// 見つからない場合はIDをそのまま返す。
-        /// </summary>
-        private static string GetAvatarTitle(AvatarExplorerV2Item[] items, IReadOnlyList<TempAvatarV2Definition> tempAvatars, string avatarId)
+        private static bool TryGetAvatarTitle(
+            AvatarExplorerV2Item[] items,
+            IReadOnlyList<TempAvatarV2Definition> tempAvatars,
+            string avatarReference,
+            out string title
+        )
         {
-            if (avatarId.StartsWith(TempAvatarPrefix))
+            title = "";
+
+            if (avatarReference.StartsWith(TempAvatarPrefix, StringComparison.OrdinalIgnoreCase))
             {
-                var tempId = avatarId[TempAvatarPrefix.Length..];
-                var tempData = tempAvatars.FirstOrDefault(x => x.Id == tempId);
+                var tempId = avatarReference[TempAvatarPrefix.Length..];
+                var tempData = tempAvatars.FirstOrDefault(x =>
+                    string.Equals(x.Id, tempId, StringComparison.OrdinalIgnoreCase)
+                );
                 if (tempData != null && !string.IsNullOrEmpty(tempData.AvatarName))
-                    return tempData.AvatarName;
-                return avatarId;
+                {
+                    title = tempData.AvatarName;
+                    return true;
+                }
+
+                return false;
             }
 
-            var avatarData = items.FirstOrDefault(x => x.Id == avatarId);
-            if (avatarData != null && !string.IsNullOrEmpty(avatarData.Title))
-                return avatarData.Title;
+            if (!avatarReference.StartsWith(ItemPrefix, StringComparison.OrdinalIgnoreCase))
+                return false;
 
-            return avatarId;
+            var itemId = avatarReference[ItemPrefix.Length..];
+            var avatarData = items.FirstOrDefault(x =>
+                string.Equals(x.Id, itemId, StringComparison.OrdinalIgnoreCase)
+            );
+            if (avatarData != null && !string.IsNullOrEmpty(avatarData.Title))
+            {
+                title = avatarData.Title;
+                return true;
+            }
+
+            return false;
         }
 
-        /// <summary>
-        /// CommonAvatar 定義を考慮して SupportedAvatar をまとめる
-        /// </summary>
         private static string[] MergeSupportedAvatarsWithCommon(
             AvatarExplorerV2Item[] items,
             string[] supportedAvatars,
             IReadOnlyList<CommonAvatarV2Definition> commonDefinitions,
-            IReadOnlyList<TempAvatarV2Definition> tempAvatars)
+            IReadOnlyList<TempAvatarV2Definition> tempAvatars
+        )
         {
-            // CommonAvatar が無ければ既存処理で終了
-            if (commonDefinitions == null || commonDefinitions.Count == 0)
-            {
+            if (commonDefinitions.Count == 0)
                 return ConvertSupportedAvatarIds(items, supportedAvatars, tempAvatars);
-            }
 
-            // ID→タイトルのマップ（重複IDは先勝ち）
-            var titleMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var id in supportedAvatars)
-            {
-                if (titleMap.ContainsKey(id)) continue;
-                var title = GetAvatarTitle(items, tempAvatars, id);
-                if (title != id) titleMap[id] = title;
-            }
-
-            var remainingIds = new HashSet<string>(supportedAvatars, StringComparer.OrdinalIgnoreCase);
             var merged = new List<string>();
+            var emittedCommonAvatarIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            // CommonAvatar を優先的にまとめる（1つでも含まれれば、定義内の全アバター名でまとめる）
-            foreach (var definition in commonDefinitions)
+            foreach (var avatarReference in supportedAvatars)
             {
-                if (definition.Avatars == null || definition.Avatars.Count == 0) continue;
-
-                // SupportedAvatar に一つでも含まれるかを判定
-                bool hasAny = definition.Avatars.Any(p => remainingIds.Contains(p));
-                if (!hasAny) continue;
-
-                // 定義内すべてのアバター名を並べる
-                var titles = new List<string>();
-                foreach (var avatarId in definition.Avatars)
+                if (avatarReference.StartsWith(CommonAvatarPrefix, StringComparison.OrdinalIgnoreCase))
                 {
-                    titles.Add(GetAvatarTitle(items, tempAvatars, avatarId));
+                    var commonAvatarId = avatarReference[CommonAvatarPrefix.Length..];
+                    if (!emittedCommonAvatarIds.Add(commonAvatarId))
+                        continue;
+
+                    var definition = commonDefinitions.FirstOrDefault(x =>
+                        string.Equals(x.Id, commonAvatarId, StringComparison.OrdinalIgnoreCase)
+                    );
+                    if (definition == null || definition.Avatars == null || definition.Avatars.Count == 0)
+                        continue;
+
+                    var titles = new List<string>();
+                    foreach (var avatarId in definition.Avatars)
+                    {
+                        if (TryGetAvatarTitle(items, tempAvatars, avatarId, out var title))
+                            titles.Add(title);
+                    }
+
+                    if (titles.Count > 0)
+                        merged.Add($"{definition.Name}({string.Join(",", titles)})");
+
+                    continue;
                 }
 
-                // まとめる対象のIDを残余から除外（重複表示を防ぐ）
-                foreach (var avatarId in definition.Avatars)
-                {
-                    remainingIds.Remove(avatarId);
-                }
-
-                merged.Add($"{definition.Name}({string.Join(",", titles)})");
-            }
-
-            // CommonAvatar にまとめられなかったものを個別追加（元の順序を尊重）
-            foreach (var id in supportedAvatars)
-            {
-                if (!remainingIds.Contains(id)) continue;
-                if (titleMap.TryGetValue(id, out var title))
-                {
-                    merged.Add(title);
-                }
+                if (TryGetAvatarTitle(items, tempAvatars, avatarReference, out var avatarTitle))
+                    merged.Add(avatarTitle);
             }
 
             return merged.ToArray();
         }
 
-        /// <summary>
-        /// tempAvatars.json を読み込む（存在しない場合は空リスト）
-        /// </summary>
-        private static IReadOnlyList<TempAvatarV2Definition> LoadTempAvatarDefinitions(string tempAvatarPath)
+        private static IReadOnlyList<TempAvatarV2Definition> LoadTempAvatarDefinitions(
+            string tempAvatarPath,
+            JsonSerializerSettings settings
+        )
         {
-            if (string.IsNullOrEmpty(tempAvatarPath) || !File.Exists(tempAvatarPath))
+            if (!File.Exists(tempAvatarPath))
             {
                 DebugLogger.Log("tempAvatars.json not found. Skipping temp avatar resolution.");
                 return Array.Empty<TempAvatarV2Definition>();
             }
 
-            try
-            {
-                var json = File.ReadAllText(tempAvatarPath);
-                var data = JsonConvert.DeserializeObject<List<TempAvatarV2Definition>>(json);
-                return data ?? new List<TempAvatarV2Definition>();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogWarning($"Failed to load temp avatar definitions: {ex.Message}");
-                return Array.Empty<TempAvatarV2Definition>();
-            }
+            var database = ReadVersionedDatabase<TempAvatarV2Database>(
+                tempAvatarPath,
+                SupportedTempAvatarVersion,
+                settings
+            );
+            return database.Items ?? new List<TempAvatarV2Definition>();
         }
 
-        /// <summary>
-        /// CommonAvatar.json を読み込む（存在しない場合は空リスト）
-        /// </summary>
-        private static IReadOnlyList<CommonAvatarV2Definition> LoadCommonAvatarDefinitions(string commonAvatarPath)
+        private static IReadOnlyList<CommonAvatarV2Definition> LoadCommonAvatarDefinitions(
+            string commonAvatarPath,
+            JsonSerializerSettings settings
+        )
         {
-            if (string.IsNullOrEmpty(commonAvatarPath) || !File.Exists(commonAvatarPath))
+            if (!File.Exists(commonAvatarPath))
             {
-                DebugLogger.Log("CommonAvatar.json not found. Skipping CommonAvatar aggregation.");
+                DebugLogger.Log("commonAvatars.json not found. Skipping Common Avatar aggregation.");
                 return Array.Empty<CommonAvatarV2Definition>();
             }
 
-            try
-            {
-                var json = File.ReadAllText(commonAvatarPath);
-                var data = JsonConvert.DeserializeObject<List<CommonAvatarV2Definition>>(json);
-                return data ?? new List<CommonAvatarV2Definition>();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogWarning($"Failed to load CommonAvatar definitions: {ex.Message}");
-                return Array.Empty<CommonAvatarV2Definition>();
-            }
+            var database = ReadVersionedDatabase<CommonAvatarV2Database>(
+                commonAvatarPath,
+                SupportedCommonAvatarVersion,
+                settings
+            );
+            return database.Items ?? new List<CommonAvatarV2Definition>();
         }
     }
 }

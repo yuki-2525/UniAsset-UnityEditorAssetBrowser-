@@ -4,7 +4,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -48,7 +47,7 @@ namespace UnityEditorAssetBrowser.Views
             GUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
             DrawItemHeader(item);
-            DrawUnityPackageSection(item.GetItemPath(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
+            DrawUnityPackageSection(item.GetItemPaths(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
 
             GUILayout.EndVertical();
         }
@@ -67,7 +66,7 @@ namespace UnityEditorAssetBrowser.Views
             
             DrawItemBasicInfo(item.GetTitle(), item.GetAuthor());
             DrawItemMetadata(item.GetTitle(), item.GetCategory(), item.GetSupportedAvatars(), item.GetTags(), item.GetMemo());
-            DrawItemActionButtons(item.GetItemPath(), item.GetBoothId(), item.GetImagePath());
+            DrawItemActionButtons(item.GetItemPaths(), item.GetBoothId(), item.GetImagePath());
             
             GUILayout.EndVertical();
 
@@ -108,18 +107,18 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// アクションボタン（エクスプローラー・Booth）を描画
         /// </summary>
-        private void DrawItemActionButtons(string itemPath, int boothItemId, string imagePath)
+        private void DrawItemActionButtons(string[] itemPaths, int boothItemId, string imagePath)
         {
             EditorGUILayout.Space(5);
             DrawSetFolderThumbnailButton(imagePath);
-            DrawExplorerOpenButton(itemPath);
+            DrawExplorerOpenButton(itemPaths);
 
             if (boothItemId > 0)
             {
                 DrawBoothOpenButton(boothItemId);
             }
 
-            if (!Directory.Exists(itemPath))
+            if (!(itemPaths ?? Array.Empty<string>()).Any(path => Directory.Exists(path) || File.Exists(path)))
             {
                 EditorGUILayout.HelpBox(LocalizationService.Instance.GetString("download_data_missing"), MessageType.Info);
             }
@@ -267,15 +266,17 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// "Explorerで開く"ボタンの描画
         /// </summary>
-        /// <param name="itemPath">アイテムパス</param>
-        private void DrawExplorerOpenButton(string itemPath)
+        /// <param name="itemPaths">アイテムの保存場所</param>
+        private void DrawExplorerOpenButton(string[] itemPaths)
         {
-            if (!Directory.Exists(itemPath)) return;
+            var itemPath = (itemPaths ?? Array.Empty<string>())
+                .FirstOrDefault(path => Directory.Exists(path) || File.Exists(path));
+            if (string.IsNullOrEmpty(itemPath)) return;
 
             if (GUILayout.Button(LocalizationService.Instance.GetString("open_explorer"), GUIStyleManager.Button, GUILayout.Width(150)))
             {
                 DebugLogger.Log($"Opening explorer for path: {itemPath}");
-                Process.Start("explorer.exe", itemPath);
+                AssetFileServices.OpenInExplorer(itemPath);
             }
         }
 
@@ -477,28 +478,102 @@ namespace UnityEditorAssetBrowser.Views
         }
 
         private readonly Dictionary<string, string[]> _cachedUnitypackages = new Dictionary<string, string[]>();
+        private readonly Dictionary<string, FileTypeGroup[]> _cachedFileTypeGroups = new Dictionary<string, FileTypeGroup[]>();
+        private readonly Dictionary<string, PackageDisplayGroups> _cachedPackageDisplayGroups = new Dictionary<string, PackageDisplayGroups>();
+        private string _cachedExtensionConfigurationSignature = string.Empty;
+
+        private sealed class FileTypeGroup
+        {
+            public readonly string TypeKey;
+            public readonly string[] Files;
+
+            public FileTypeGroup(string typeKey, string[] files)
+            {
+                TypeKey = typeKey;
+                Files = files;
+            }
+        }
+
+        private sealed class PackageDisplayGroups
+        {
+            public readonly string[] MaterialPackages;
+            public readonly string[] OtherPackages;
+
+            public PackageDisplayGroups(string[] materialPackages, string[] otherPackages)
+            {
+                MaterialPackages = materialPackages;
+                OtherPackages = otherPackages;
+            }
+        }
 
         /// <summary>
-        /// UnityPackageセクションの描画
+        /// アイテム保存場所にある対応ファイルのセクションを描画
         /// </summary>
-        /// <param name="itemPath">アイテムパス</param>
+        /// <param name="itemPaths">アイテムの保存場所</param>
         /// <param name="itemName">アイテム名</param>
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="category">カテゴリ</param>
-        private void DrawUnityPackageSection(string itemPath, string itemName, string imagePath, string category)
+        private void DrawUnityPackageSection(string[] itemPaths, string itemName, string imagePath, string category)
         {
-            if (!_cachedUnitypackages.TryGetValue(itemName, out var unityPackages))
+            string configurationSignature = AssetFileExtensionService.GetConfigurationSignature();
+            if (!string.Equals(_cachedExtensionConfigurationSignature, configurationSignature, StringComparison.Ordinal))
             {
-                unityPackages = UnityPackageServices.FindUnityPackages(itemPath);
-                _cachedUnitypackages.Add(itemName, unityPackages);
+                _cachedUnitypackages.Clear();
+                _cachedFileTypeGroups.Clear();
+                _cachedPackageDisplayGroups.Clear();
+                _cachedExtensionConfigurationSignature = configurationSignature;
             }
 
-            if (!unityPackages.Any()) return;
+            string cacheKey = $"{itemName}|{configurationSignature}";
+            if (!_cachedUnitypackages.TryGetValue(cacheKey, out var unityPackages))
+            {
+                var searchExtensions = AssetFileExtensionService.GetSearchExtensions();
+                unityPackages = AssetFileServices.FindFilesFromPaths(itemPaths ?? Array.Empty<string>(), searchExtensions)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(path)))
+                    .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                _cachedUnitypackages.Add(cacheKey, unityPackages);
+            }
+
+            if (unityPackages.Length == 0) return;
+
+            if (!_cachedFileTypeGroups.TryGetValue(cacheKey, out var fileGroups))
+            {
+                fileGroups = unityPackages
+                    .GroupBy(path => AssetFileExtensionService.GetFileTypeKey(Path.GetExtension(path)))
+                    .Select(group => new FileTypeGroup(group.Key, group.ToArray()))
+                    .OrderBy(group => group.Files.Min(path => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(path))))
+                    .ThenBy(group => group.TypeKey, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                _cachedFileTypeGroups[cacheKey] = fileGroups;
+            }
+
+            foreach (var fileGroup in fileGroups)
+            {
+                DrawFileTypeSection(fileGroup.Files, itemName, imagePath, category, fileGroup.TypeKey, cacheKey);
+            }
+        }
+
+        /// <summary>
+        /// ファイル種別ごとのフォールドアウトを描画
+        /// </summary>
+        private void DrawFileTypeSection(
+            string[] unityPackages,
+            string itemName,
+            string imagePath,
+            string category,
+            string fileTypeKey,
+            string fileCacheKey)
+        {
+            if (unityPackages.Length == 0) return;
+
+            string foldoutKey = $"{itemName}|{fileTypeKey}";
 
             // フォールドアウトの状態を初期化（キーが存在しない場合）
-            if (!_unityPackageFoldouts.ContainsKey(itemName))
+            if (!_unityPackageFoldouts.ContainsKey(foldoutKey))
             {
-                _unityPackageFoldouts[itemName] = false;
+                _unityPackageFoldouts[foldoutKey] = false;
             }
 
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
@@ -524,72 +599,26 @@ namespace UnityEditorAssetBrowser.Views
                 // フォールドアウトの状態を更新
                 if (Event.current.type == EventType.MouseDown && boxRect.Contains(Event.current.mousePosition))
                 {
-                    _unityPackageFoldouts[itemName] = !_unityPackageFoldouts[itemName];
-                    DebugLogger.Log($"UnityPackage foldout toggled for {itemName}: {_unityPackageFoldouts[itemName]}");
+                    _unityPackageFoldouts[foldoutKey] = !_unityPackageFoldouts[foldoutKey];
+                    DebugLogger.Log($"{fileTypeKey} foldout toggled for {itemName}: {_unityPackageFoldouts[foldoutKey]}");
                     Event.current.Use();
                 }
 
                 // フォールドアウトとラベルを描画
-                _unityPackageFoldouts[itemName] = EditorGUI.Foldout(
+                _unityPackageFoldouts[foldoutKey] = EditorGUI.Foldout(
                     foldoutRect,
-                    _unityPackageFoldouts[itemName],
+                    _unityPackageFoldouts[foldoutKey],
                     ""
                 );
-                EditorGUI.LabelField(labelRect, LocalizationService.Instance.GetString("unity_package"), GUIStyleManager.Label);
+                EditorGUI.LabelField(labelRect, GetFileTypeLabel(fileTypeKey), GUIStyleManager.Label);
 
-                if (_unityPackageFoldouts[itemName])
+                if (_unityPackageFoldouts[foldoutKey])
                 {
                     EditorGUI.indentLevel++;
 
-                    // パッケージを分類
-                    var keywords = new[] { "mat", "material", "tex", "texture", "base", "source","共通" };
-                    
-                    var scoredPackages = unityPackages.Select(p => 
-                    {
-                        string fileName = Path.GetFileName(p);
-                        int score = keywords.Sum(k => 
-                        {
-                            int count = 0;
-                            int i = 0;
-                            while ((i = fileName.IndexOf(k, i, StringComparison.OrdinalIgnoreCase)) != -1)
-                            {
-                                i += k.Length;
-                                count++;
-                            }
-                            return count;
-                        });
-                        return new { Package = p, Score = score };
-                    }).ToList();
-
-                    int maxScore = scoredPackages.Any() ? scoredPackages.Max(x => x.Score) : 0;
-
-                    List<string> materialPackages;
-                    List<string> otherPackages;
-
-                    if (maxScore > 0)
-                    {
-                        materialPackages = scoredPackages
-                            .Where(x => x.Score == maxScore)
-                            .Select(x => x.Package)
-                            .ToList();
-                        
-                        otherPackages = scoredPackages
-                            .Where(x => x.Score < maxScore)
-                            .Select(x => x.Package)
-                            .ToList();
-                    }
-                    else
-                    {
-                        materialPackages = new List<string>();
-                        otherPackages = unityPackages.ToList();
-                    }
-
-                    // unityPackages > 2 かつ materialPackages > otherPackages の場合は全てotherPackagesとして処理
-                    if (unityPackages.Count() > 2 && materialPackages.Count > otherPackages.Count)
-                    {
-                        materialPackages.Clear();
-                        otherPackages = unityPackages.ToList();
-                    }
+                    var packageDisplayGroups = GetPackageDisplayGroups(fileCacheKey, fileTypeKey, unityPackages);
+                    string[] materialPackages = packageDisplayGroups.MaterialPackages;
+                    string[] otherPackages = packageDisplayGroups.OtherPackages;
 
                     int lineIndex = 0;
 
@@ -599,11 +628,11 @@ namespace UnityEditorAssetBrowser.Views
                         EditorGUILayout.BeginVertical(EditorStyles.helpBox);
                         EditorGUILayout.LabelField(LocalizationService.Instance.GetString("material"), EditorStyles.miniBoldLabel);
 
-                        for (int i = 0; i < materialPackages.Count; i++)
+                        for (int i = 0; i < materialPackages.Length; i++)
                         {
-                            DrawUnityPackageItem(materialPackages[i], imagePath, category);
+                            DrawItemFile(materialPackages[i], imagePath, category);
 
-                            if (i < materialPackages.Count - 1)
+                            if (i < materialPackages.Length - 1)
                             {
                                 var lineRect = EditorGUILayout.GetControlRect(false, 1);
                                 Color lineColor = LineColors[lineIndex % LineColors.Length];
@@ -620,11 +649,11 @@ namespace UnityEditorAssetBrowser.Views
                     }
 
                     // その他のパッケージの描画
-                    for (int i = 0; i < otherPackages.Count; i++)
+                    for (int i = 0; i < otherPackages.Length; i++)
                     {
-                        DrawUnityPackageItem(otherPackages[i], imagePath, category);
+                        DrawItemFile(otherPackages[i], imagePath, category);
 
-                        if (i < otherPackages.Count - 1)
+                        if (i < otherPackages.Length - 1)
                         {
                             var lineRect = EditorGUILayout.GetControlRect(false, 1);
                             Color lineColor = LineColors[lineIndex % LineColors.Length];
@@ -641,11 +670,143 @@ namespace UnityEditorAssetBrowser.Views
             }
             EditorGUILayout.EndVertical();
         }
+
+        private PackageDisplayGroups GetPackageDisplayGroups(string fileCacheKey, string fileTypeKey, string[] unityPackages)
+        {
+            if (!string.Equals(fileTypeKey, "unitypackage", StringComparison.OrdinalIgnoreCase))
+                return new PackageDisplayGroups(Array.Empty<string>(), unityPackages);
+
+            string cacheKey = $"{fileCacheKey}|{fileTypeKey}";
+            if (_cachedPackageDisplayGroups.TryGetValue(cacheKey, out var cachedGroups))
+                return cachedGroups;
+
+            var keywords = new[] { "mat", "material", "tex", "texture", "base", "source", "共通" };
+            var scoredPackages = unityPackages.Select(package =>
+            {
+                string fileName = Path.GetFileName(package);
+                int score = keywords.Sum(keyword =>
+                {
+                    int count = 0;
+                    int index = 0;
+                    while ((index = fileName.IndexOf(keyword, index, StringComparison.OrdinalIgnoreCase)) != -1)
+                    {
+                        index += keyword.Length;
+                        count++;
+                    }
+                    return count;
+                });
+                return new { Package = package, Score = score };
+            }).ToList();
+
+            int maxScore = scoredPackages.Count > 0 ? scoredPackages.Max(x => x.Score) : 0;
+            string[] materialPackages = Array.Empty<string>();
+            string[] otherPackages = unityPackages;
+            if (maxScore > 0)
+            {
+                materialPackages = scoredPackages
+                    .Where(x => x.Score == maxScore)
+                    .Select(x => x.Package)
+                    .ToArray();
+                otherPackages = scoredPackages
+                    .Where(x => x.Score < maxScore)
+                    .Select(x => x.Package)
+                    .ToArray();
+            }
+
+            // パッケージ数が多い場合は、マテリアルだけが過半数になる分類を行わない。
+            if (unityPackages.Length > 2 && materialPackages.Length > otherPackages.Length)
+            {
+                materialPackages = Array.Empty<string>();
+                otherPackages = unityPackages;
+            }
+
+            var groups = new PackageDisplayGroups(materialPackages, otherPackages);
+            _cachedPackageDisplayGroups[cacheKey] = groups;
+            return groups;
+        }
+
+        private string GetFileTypeLabel(string fileTypeKey)
+        {
+            switch (fileTypeKey)
+            {
+                case "unitypackage":
+                    return LocalizationService.Instance.GetString("unity_package");
+                case "txt":
+                    return LocalizationService.Instance.GetString("file_type_txt");
+                case "image":
+                    return LocalizationService.Instance.GetString("file_type_image");
+                case "fbx":
+                    return LocalizationService.Instance.GetString("file_type_fbx");
+                case "blend":
+                    return LocalizationService.Instance.GetString("file_type_blend");
+                default:
+                    return $".{fileTypeKey}";
+            }
+        }
+
+        private void DrawItemFile(string filePath, string imagePath, string category)
+        {
+            if (string.Equals(Path.GetExtension(filePath), ".unitypackage", StringComparison.OrdinalIgnoreCase))
+            {
+                DrawUnityPackageItem(filePath, imagePath, category);
+                return;
+            }
+
+            DrawOtherFileItem(filePath);
+        }
+
+        private void DrawOtherFileItem(string filePath)
+        {
+            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+            EditorGUILayout.LabelField(new GUIContent(Path.GetFileName(filePath), filePath), GUIStyleManager.Label);
+
+            EditorGUILayout.BeginHorizontal();
+            if (GUILayout.Button(LocalizationService.Instance.GetString("import_file"), GUIStyleManager.Button, GUILayout.Width(100)))
+            {
+                string destinationFolder = EditorUtility.OpenFolderPanel(
+                    LocalizationService.Instance.GetString("select_directory"),
+                    Path.GetDirectoryName(filePath) ?? string.Empty,
+                    "");
+
+                if (!string.IsNullOrEmpty(destinationFolder))
+                {
+                    string destinationPath = Path.Combine(destinationFolder, Path.GetFileName(filePath));
+                    bool canCopy = !File.Exists(destinationPath) ||
+                        string.Equals(Path.GetFullPath(filePath), Path.GetFullPath(destinationPath), StringComparison.OrdinalIgnoreCase) ||
+                        EditorUtility.DisplayDialog(
+                            LocalizationService.Instance.GetString("overwrite_file_title"),
+                            LocalizationService.Instance.GetString("overwrite_file_message"),
+                            LocalizationService.Instance.GetString("ok"),
+                            LocalizationService.Instance.GetString("cancel"));
+
+                    if (canCopy && AssetFileServices.CopyToFolder(filePath, destinationFolder, out _))
+                    {
+                        AssetDatabase.Refresh();
+                    }
+                }
+            }
+
+            if (GUILayout.Button(LocalizationService.Instance.GetString("open_explorer"), GUIStyleManager.Button, GUILayout.Width(120)))
+            {
+                AssetFileServices.OpenInExplorer(filePath);
+            }
+
+            if (GUILayout.Button(LocalizationService.Instance.GetString("open_default_application"), GUIStyleManager.Button, GUILayout.Width(140)))
+            {
+                AssetFileServices.OpenWithDefaultApplication(filePath);
+            }
+            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
+        }
         
         /// <summary>
-        /// Unitypackageのキャッシュをリセットします。
+        /// アイテムファイルのキャッシュをリセットします。
         /// </summary>
         public void ResetUnitypackageCache()
-            => _cachedUnitypackages.Clear();
+        {
+            _cachedUnitypackages.Clear();
+            _cachedFileTypeGroups.Clear();
+            _cachedPackageDisplayGroups.Clear();
+        }
     }
 }

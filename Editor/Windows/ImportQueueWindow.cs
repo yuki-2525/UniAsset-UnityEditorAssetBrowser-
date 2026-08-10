@@ -2,6 +2,7 @@
 
 #nullable enable
 
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using UnityEditor;
@@ -486,16 +487,21 @@ namespace UnityEditorAssetBrowser.Windows
         /// </summary>
         private void AddPackagesFromItem(IDatabaseItem item)
         {
-            var itemPath = item.GetItemPath();
-            if (string.IsNullOrEmpty(itemPath) || !System.IO.Directory.Exists(itemPath))
+            var itemPaths = (item.GetItemPaths() ?? Array.Empty<string>())
+                .Where(System.IO.Directory.Exists)
+                .ToArray();
+            if (itemPaths.Length == 0)
             {
-                 DebugLogger.LogError($"Item path not found: {itemPath}");
+                 DebugLogger.LogError($"Item paths not found for: {item.GetTitle()}");
                  ShowNotification(new GUIContent(LocalizationService.Instance.GetString("download_data_missing") ?? "Download data missing"));
                  return;
             }
 
-            // アイテムのパスからUnityPackageを検索
-            var packages = UnityPackageServices.FindUnityPackages(itemPath);
+            // アイテムのすべての保存場所からUnityPackageを検索
+            var packages = itemPaths
+                .SelectMany(UnityPackageServices.FindUnityPackages)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
             if (packages == null || packages.Length == 0)
             {
                  DebugLogger.Log($"No unitypackages found for item: {item.GetTitle()}");
