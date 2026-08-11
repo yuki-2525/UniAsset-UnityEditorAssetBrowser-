@@ -13,6 +13,46 @@ using UnityEditorAssetBrowser.Services;
 
 namespace UnityEditorAssetBrowser.Models
 {
+    internal sealed class KonoAssetItemPathCache
+    {
+        private string _key = string.Empty;
+        private string _itemPath = string.Empty;
+        private string[] _itemPaths = Array.Empty<string>();
+        private string _imagePath = string.Empty;
+
+        private void Ensure(string id, string? imageFilename)
+        {
+            string root = DatabaseService.GetKADatabasePath();
+            string key = root + "\n" + id + "\n" + imageFilename;
+            if (string.Equals(_key, key, StringComparison.Ordinal)) return;
+
+            _key = key;
+            _itemPath = Path.GetFullPath(Path.Combine(root, "data", id));
+            _itemPaths = new[] { _itemPath };
+            _imagePath = string.IsNullOrEmpty(imageFilename)
+                ? string.Empty
+                : Path.GetFullPath(Path.Combine(root, "images", imageFilename));
+        }
+
+        public string GetItemPath(string id, string? imageFilename)
+        {
+            Ensure(id, imageFilename);
+            return _itemPath;
+        }
+
+        public string[] GetItemPaths(string id, string? imageFilename)
+        {
+            Ensure(id, imageFilename);
+            return _itemPaths;
+        }
+
+        public string GetImagePath(string id, string? imageFilename)
+        {
+            Ensure(id, imageFilename);
+            return _imagePath;
+        }
+    }
+
     /// <summary>
     /// 統合されたKonoAssetデータベース
     /// 全てのKonoAssetデータベースのアイテムをまとめて管理する
@@ -104,6 +144,7 @@ namespace UnityEditorAssetBrowser.Models
     /// </summary>
     public class KonoAssetWearableItem : IDatabaseItem
     {
+        private readonly KonoAssetItemPathCache _pathCache = new KonoAssetItemPathCache();
         /// <summary>
         /// アイテムのID
         /// </summary>
@@ -136,12 +177,10 @@ namespace UnityEditorAssetBrowser.Models
         public string GetMemo()
             => Description.Memo ?? "";
         public string GetItemPath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
-        public string[] GetItemPaths() => new[] { GetItemPath() };
+            => _pathCache.GetItemPath(Id, Description.ImageFilename);
+        public string[] GetItemPaths() => _pathCache.GetItemPaths(Id, Description.ImageFilename);
         public string GetImagePath()
-            => string.IsNullOrEmpty(Description.ImageFilename)
-                ? ""
-                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => _pathCache.GetImagePath(Id, Description.ImageFilename);
         public string[] GetSupportedAvatars()
             => SupportedAvatars;
         public int GetBoothId()
@@ -162,6 +201,7 @@ namespace UnityEditorAssetBrowser.Models
     /// </summary>
     public class KonoAssetAvatarItem : IDatabaseItem
     {
+        private readonly KonoAssetItemPathCache _pathCache = new KonoAssetItemPathCache();
         /// <summary>
         /// アバターのID
         /// </summary>
@@ -181,12 +221,10 @@ namespace UnityEditorAssetBrowser.Models
         public string GetMemo()
             => Description.Memo ?? "";
         public string GetItemPath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
-        public string[] GetItemPaths() => new[] { GetItemPath() };
+            => _pathCache.GetItemPath(Id, Description.ImageFilename);
+        public string[] GetItemPaths() => _pathCache.GetItemPaths(Id, Description.ImageFilename);
         public string GetImagePath()
-            => string.IsNullOrEmpty(Description.ImageFilename)
-                ? ""
-                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => _pathCache.GetImagePath(Id, Description.ImageFilename);
         public string[] GetSupportedAvatars()
             => Array.Empty<string>();
         public int GetBoothId()
@@ -207,6 +245,7 @@ namespace UnityEditorAssetBrowser.Models
     /// </summary>
     public class KonoAssetWorldObjectItem : IDatabaseItem
     {
+        private readonly KonoAssetItemPathCache _pathCache = new KonoAssetItemPathCache();
         /// <summary>
         /// オブジェクトのID
         /// </summary>
@@ -232,12 +271,10 @@ namespace UnityEditorAssetBrowser.Models
         public string GetMemo()
             => Description.Memo ?? "";
         public string GetItemPath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
-        public string[] GetItemPaths() => new[] { GetItemPath() };
+            => _pathCache.GetItemPath(Id, Description.ImageFilename);
+        public string[] GetItemPaths() => _pathCache.GetItemPaths(Id, Description.ImageFilename);
         public string GetImagePath()
-            => string.IsNullOrEmpty(Description.ImageFilename)
-                ? ""
-                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => _pathCache.GetImagePath(Id, Description.ImageFilename);
         public string[] GetSupportedAvatars()
             => Array.Empty<string>();
         public int GetBoothId()
@@ -258,6 +295,7 @@ namespace UnityEditorAssetBrowser.Models
     /// </summary>
     public class KonoAssetOtherAssetItem : IDatabaseItem
     {
+        private readonly KonoAssetItemPathCache _pathCache = new KonoAssetItemPathCache();
         /// <summary>
         /// アセットのID
         /// </summary>
@@ -283,12 +321,10 @@ namespace UnityEditorAssetBrowser.Models
         public string GetMemo()
             => Description.Memo ?? "";
         public string GetItemPath()
-            => Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "data", Id));
-        public string[] GetItemPaths() => new[] { GetItemPath() };
+            => _pathCache.GetItemPath(Id, Description.ImageFilename);
+        public string[] GetItemPaths() => _pathCache.GetItemPaths(Id, Description.ImageFilename);
         public string GetImagePath()
-            => string.IsNullOrEmpty(Description.ImageFilename)
-                ? ""
-                : Path.GetFullPath(Path.Combine(DatabaseService.GetKADatabasePath(), "images", Description.ImageFilename));
+            => _pathCache.GetImagePath(Id, Description.ImageFilename);
         public string[] GetSupportedAvatars()
             => Array.Empty<string>();
         public int GetBoothId()

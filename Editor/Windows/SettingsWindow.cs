@@ -48,12 +48,25 @@ namespace UnityEditorAssetBrowser.Windows
 
             _settingsView.OnSettingsChanged += () =>
             {
+                _assetBrowserViewModel?.InvalidateCategoryAssetTypeCache();
                 var window = Resources.FindObjectsOfTypeAll<UnityEditorAssetBrowser>().FirstOrDefault();
                 if (window != null)
                 {
                     window.Repaint();
                 }
             };
+            DatabaseService.OnPathChanged += OnDatabasePathChanged;
+        }
+
+        private void OnDisable()
+        {
+            DatabaseService.OnPathChanged -= OnDatabasePathChanged;
+        }
+
+        private void OnDatabasePathChanged()
+        {
+            _settingsView?.RefreshDatabaseSummaries();
+            Repaint();
         }
 
         private void OnGUI()
@@ -63,13 +76,12 @@ namespace UnityEditorAssetBrowser.Windows
 
         public void AddItemsToMenu(GenericMenu menu)
         {
-            const string debugKey = "UniAsset_DebugMode";
-            bool isDebug = EditorPrefs.GetBool(debugKey, false);
+            bool isDebug = DebugLogger.IsDebugMode;
 
             menu.AddItem(new GUIContent("Debug Mode"), isDebug, () =>
             {
                 bool newState = !isDebug;
-                EditorPrefs.SetBool(debugKey, newState);
+                DebugLogger.SetDebugMode(newState);
                 Debug.Log($"[UniAsset][Debug] Debug Mode toggled: {(newState ? "ON" : "OFF")}");
             });
         }

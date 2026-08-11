@@ -308,7 +308,7 @@ namespace UnityEditorAssetBrowser.Windows
                         if (genericData is Models.ImportQueueItem item)
                         {
                             DebugLogger.Log($"Dropped internal item to Import Queue: {item.PackageName}");
-                            ImportQueueService.Instance.Add(item.PackagePath, item.PackageName, item.ThumbnailPath, item.Category);
+                            ImportQueueService.Instance.Add(item.PackagePath, item.PackageName, item.ThumbnailPath, item.Category, item.DatabaseItem);
                         }
                         else if (paths != null && paths.Length > 0)
                         {
@@ -378,96 +378,12 @@ namespace UnityEditorAssetBrowser.Windows
 
         private IDatabaseItem? FindItemByImagePath(string path)
         {
-            string normalizedPath = NormalizePath(path);
-            DebugLogger.Log($"Searching item for normalized image path: {normalizedPath}");
-
-            bool IsMatch(IDatabaseItem item)
-            {
-                var imgPath = item.GetImagePath();
-                if (string.IsNullOrEmpty(imgPath)) return false;
-                return NormalizePath(imgPath) == normalizedPath;
-            }
-
-            // AE Database
-            var aeDb = DatabaseService.GetAEDatabase();
-            if (aeDb != null)
-            {
-                DebugLogger.Log("Searching in AE Database...");
-                var item = aeDb.Items.FirstOrDefault(IsMatch);
-                if (item != null)
-                {
-                    DebugLogger.Log("Found in AE Database.");
-                    return item;
-                }
-            }
-
-            // KA Database
-            var kaDb = DatabaseService.GetKADatabase();
-            if (kaDb != null)
-            {
-                DebugLogger.Log("Searching in KA Database...");
-                var item = kaDb.Items.FirstOrDefault(IsMatch);
-                if (item != null)
-                {
-                    DebugLogger.Log("Found in KA Database.");
-                    return item;
-                }
-            }
-
-            // BOOTHLM Database
-            var boothlmDb = DatabaseService.GetBOOTHLMDatabase();
-            if (boothlmDb != null)
-            {
-                DebugLogger.Log("Searching in BOOTHLM Database...");
-                var item = boothlmDb.Items.FirstOrDefault(IsMatch);
-                if (item != null)
-                {
-                    DebugLogger.Log("Found in BOOTHLM Database.");
-                    return item;
-                }
-            }
-
-            DebugLogger.Log("Item not found in any database.");
-            return null;
+            return DatabaseService.FindItemByImagePath(path);
         }
 
         private IDatabaseItem? FindItemByImageFileName(string namePart)
         {
-            DebugLogger.Log($"Searching item for image name part: {namePart}");
-
-            bool IsMatch(IDatabaseItem item)
-            {
-                var imgPath = item.GetImagePath();
-                if (string.IsNullOrEmpty(imgPath)) return false;
-                // パスの中にキーワードが含まれているか確認
-                return imgPath.Contains(namePart);
-            }
-
-            // AE Database
-            var aeDb = DatabaseService.GetAEDatabase();
-            if (aeDb != null)
-            {
-                var item = aeDb.Items.FirstOrDefault(IsMatch);
-                if (item != null) return item;
-            }
-
-            // KA Database
-            var kaDb = DatabaseService.GetKADatabase();
-            if (kaDb != null)
-            {
-                var item = kaDb.Items.FirstOrDefault(IsMatch);
-                if (item != null) return item;
-            }
-
-            // BOOTHLM Database
-            var boothlmDb = DatabaseService.GetBOOTHLMDatabase();
-            if (boothlmDb != null)
-            {
-                var item = boothlmDb.Items.FirstOrDefault(IsMatch);
-                if (item != null) return item;
-            }
-
-            return null;
+            return DatabaseService.FindItemByImageName(namePart);
         }
 
         private string NormalizePath(string path)
@@ -517,7 +433,8 @@ namespace UnityEditorAssetBrowser.Windows
                     pkg,
                     System.IO.Path.GetFileName(pkg),
                     item.GetImagePath(),
-                    item.GetCategory()
+                    item.GetCategory(),
+                    item
                 );
                 addedCount++;
             }
@@ -607,29 +524,7 @@ namespace UnityEditorAssetBrowser.Windows
                 return;
             }
 
-            IDatabaseItem? foundItem = null;
-
-            // 各データベースからアイテムを検索
-            // AvatarExplorerデータベースを検索
-            var aeDb = DatabaseService.GetAEDatabase();
-            if (aeDb != null)
-                foundItem = aeDb.Items.FirstOrDefault(x => x.GetBoothId() == boothId);
-
-            // KonoAssetデータベースを検索
-            if (foundItem == null)
-            {
-                var kaDb = DatabaseService.GetKADatabase();
-                if (kaDb != null)
-                    foundItem = kaDb.Items.FirstOrDefault(x => x.GetBoothId() == boothId);
-            }
-
-            // BOOTHLMデータベースを検索
-            if (foundItem == null)
-            {
-                var boothlmDb = DatabaseService.GetBOOTHLMDatabase();
-                if (boothlmDb != null)
-                    foundItem = boothlmDb.Items.FirstOrDefault(x => x.GetBoothId() == boothId);
-            }
+            IDatabaseItem? foundItem = DatabaseService.FindItemByBoothId(boothId);
 
             if (foundItem == null)
             {

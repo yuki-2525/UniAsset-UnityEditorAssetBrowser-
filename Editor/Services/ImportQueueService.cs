@@ -8,6 +8,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Models;
 using UnityEditorAssetBrowser.Helper;
+using UnityEditorAssetBrowser.Interfaces;
 using UnityEngine;
 
 namespace UnityEditorAssetBrowser.Services
@@ -38,7 +39,12 @@ namespace UnityEditorAssetBrowser.Services
         /// <summary>
         /// キューにアイテムを追加
         /// </summary>
-        public void Add(string packagePath, string packageName, string thumbnailPath, string category)
+        public void Add(
+            string packagePath,
+            string packageName,
+            string thumbnailPath,
+            string category,
+            IDatabaseItem? databaseItem = null)
         {
             if (_queue.Any(x => x.PackagePath == packagePath))
             {
@@ -51,7 +57,8 @@ namespace UnityEditorAssetBrowser.Services
                 PackagePath = packagePath,
                 PackageName = packageName,
                 ThumbnailPath = thumbnailPath,
-                Category = category
+                Category = category,
+                DatabaseItem = databaseItem
             });
             OnQueueChanged?.Invoke();
             DebugLogger.Log($"Added to import queue: {packageName}");
@@ -132,20 +139,27 @@ namespace UnityEditorAssetBrowser.Services
             {
                 // UnityPackageServicesを使用してインポート（サムネイル生成などを含む）
                 // ダイアログは強制的に非表示
-                UnityPackageServices.ImportPackageAndSetThumbnails(
-                    item.PackagePath,
-                    item.ThumbnailPath,
-                    item.Category,
-                    null, // forceImportToCategoryFolder
-                    false, // showDialog
-                    (error) => // onPreImportError
+                BoothUpdateCheckService.CheckBeforeImport(
+                    item.DatabaseItem,
+                    () => UnityPackageServices.ImportPackageAndSetThumbnails(
+                        item.PackagePath,
+                        item.ThumbnailPath,
+                        item.Category,
+                        null, // forceImportToCategoryFolder
+                        false, // showDialog
+                        (error) => // onPreImportError
+                        {
+                            DebugLogger.LogError($"Pre-import error for {item.PackageName}: {error}");
+                            UnregisterHandlers();
+                            _currentImportIndex++;
+                            ProcessNextImport();
+                        }),
+                    () =>
                     {
-                        DebugLogger.LogError($"Pre-import error for {item.PackageName}: {error}");
                         UnregisterHandlers();
                         _currentImportIndex++;
                         ProcessNextImport();
-                    }
-                );
+                    });
             }
             catch (Exception ex)
             {

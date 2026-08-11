@@ -199,6 +199,10 @@ namespace UnityEditorAssetBrowser.Models
         /// アイテムのタグ
         /// </summary>
         public string[] Tags { get; set; } = Array.Empty<string>();
+        private string[]? _resolvedItemPaths;
+        private string _resolvedItemPathsRoot = string.Empty;
+        private string? _resolvedImagePath;
+        private string _resolvedImagePathRoot = string.Empty;
 
         public string GetTitle()
             => Title;
@@ -213,13 +217,18 @@ namespace UnityEditorAssetBrowser.Models
 
         public string[] GetItemPaths()
         {
+            string databaseRoot = DatabaseService.GetAEDatabasePath();
+            if (_resolvedItemPaths != null && string.Equals(_resolvedItemPathsRoot, databaseRoot, StringComparison.OrdinalIgnoreCase))
+                return _resolvedItemPaths;
+
             var paths = new List<string>();
 
             AddItemPath(paths, ItemPath);
             foreach (var itemPath in ItemPaths ?? Array.Empty<string>())
                 AddItemPath(paths, itemPath);
 
-            return paths.ToArray();
+            _resolvedItemPathsRoot = databaseRoot;
+            return _resolvedItemPaths = paths.ToArray();
         }
 
         private static void AddItemPath(List<string> paths, string itemPath)
@@ -248,18 +257,24 @@ namespace UnityEditorAssetBrowser.Models
         }
         public string GetImagePath()
         {
+            string databaseRoot = DatabaseService.GetAEDatabasePath();
+            if (_resolvedImagePath != null && string.Equals(_resolvedImagePathRoot, databaseRoot, StringComparison.OrdinalIgnoreCase))
+                return _resolvedImagePath;
             try
             {
                 if (ImagePath.StartsWith("Datas\\"))
                 {
-                    return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), ImagePath.Replace("Datas\\", "")));
+                    _resolvedImagePathRoot = databaseRoot;
+                    return _resolvedImagePath = Path.GetFullPath(Path.Combine(databaseRoot, ImagePath.Replace("Datas\\", "")));
                 }
 
-                return Path.GetFullPath(ImagePath);
+                _resolvedImagePathRoot = databaseRoot;
+                return _resolvedImagePath = Path.GetFullPath(ImagePath);
             }
             catch
             {
-                return string.Empty;
+                _resolvedImagePathRoot = databaseRoot;
+                return _resolvedImagePath = string.Empty;
             }
         }
         public string[] GetSupportedAvatars()

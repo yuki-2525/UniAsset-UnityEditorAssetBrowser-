@@ -79,9 +79,10 @@ namespace UnityEditorAssetBrowser.Helper
                 if (items != null)
                 {
                     DebugLogger.Log($"Loaded {items.Length} items from AE database.");
+                    var itemsByPath = BuildItemPathIndex(items);
                     foreach (var item in items)
                     {
-                        item.SupportedAvatar = MergeSupportedAvatarsWithCommon(items, item.SupportedAvatar, commonAvatarDefinitions);
+                        item.SupportedAvatar = MergeSupportedAvatarsWithCommon(itemsByPath, item.SupportedAvatar, commonAvatarDefinitions);
                     }
 
                     return new AvatarExplorerDatabase(items);
@@ -125,14 +126,29 @@ namespace UnityEditorAssetBrowser.Helper
         /// <param name="items">全アイテムリスト</param>
         /// <param name="supportedAvatars">変換対象の対応アバターパス配列</param>
         /// <returns>変換後のアバター名配列</returns>
-        private static string[] ConvertSupportedAvatarPaths(AvatarExplorerItem[] items, string[] supportedAvatars)
+        private static IReadOnlyDictionary<string, AvatarExplorerItem> BuildItemPathIndex(
+            IEnumerable<AvatarExplorerItem> items)
+        {
+            var result = new Dictionary<string, AvatarExplorerItem>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in items)
+            {
+                if (!string.IsNullOrEmpty(item.ItemPath) && !result.ContainsKey(item.ItemPath))
+                    result.Add(item.ItemPath, item);
+            }
+
+            return result;
+        }
+
+        private static string[] ConvertSupportedAvatarPaths(
+            IReadOnlyDictionary<string, AvatarExplorerItem> itemsByPath,
+            string[] supportedAvatars)
         {
             var supportedAvatarNames = new List<string>();
 
             foreach (var avatar in supportedAvatars)
             {
-                var avatarData = items.FirstOrDefault(x => x.ItemPath == avatar);
-                if (avatarData != null) supportedAvatarNames.Add(avatarData.Title);
+                if (itemsByPath.TryGetValue(avatar, out var avatarData))
+                    supportedAvatarNames.Add(avatarData.Title);
             }
 
             return supportedAvatarNames.ToArray();
@@ -141,23 +157,13 @@ namespace UnityEditorAssetBrowser.Helper
         /// <summary>
         /// アバターパスからタイトルを取得する（既存のパス→タイトル変換を再利用し、見つからない場合はパスでフォールバック）
         /// </summary>
-        private static string GetAvatarTitle(AvatarExplorerItem[] items, string avatarPath)
+        private static string GetAvatarTitle(
+            IReadOnlyDictionary<string, AvatarExplorerItem> itemsByPath,
+            string avatarPath)
         {
-            // 単一要素で既存変換を利用
-            var converted = ConvertSupportedAvatarPaths(items, new[] { avatarPath });
-            if (converted.Length > 0 && !string.IsNullOrEmpty(converted[0]))
-            {
-                return converted[0];
-            }
-
-            // 念のため直接検索も行う
-            var avatarData = items.FirstOrDefault(x => string.Equals(x.ItemPath, avatarPath, StringComparison.OrdinalIgnoreCase));
-            if (avatarData != null && !string.IsNullOrEmpty(avatarData.Title))
-            {
+            if (itemsByPath.TryGetValue(avatarPath, out var avatarData) && !string.IsNullOrEmpty(avatarData.Title))
                 return avatarData.Title;
-            }
 
-            // 最後のフォールバックはパス
             return avatarPath;
         }
 
@@ -165,14 +171,14 @@ namespace UnityEditorAssetBrowser.Helper
         /// CommonAvatar 定義を考慮して SupportedAvatar をまとめる
         /// </summary>
         private static string[] MergeSupportedAvatarsWithCommon(
-            AvatarExplorerItem[] items,
+            IReadOnlyDictionary<string, AvatarExplorerItem> itemsByPath,
             string[] supportedAvatars,
             IReadOnlyList<CommonAvatarDefinition> commonDefinitions)
         {
             // CommonAvatar が無ければ既存処理で終了
             if (commonDefinitions == null || commonDefinitions.Count == 0)
             {
-                return ConvertSupportedAvatarPaths(items, supportedAvatars);
+                return ConvertSupportedAvatarPaths(itemsByPath, supportedAvatars);
             }
 
             // パス→タイトルのマップ（重複パスは先勝ち）。
@@ -180,8 +186,8 @@ namespace UnityEditorAssetBrowser.Helper
             foreach (var path in supportedAvatars)
             {
                 if (titleMap.ContainsKey(path)) continue;
-                var avatarData = items.FirstOrDefault(x => x.ItemPath == path);
-                if (avatarData != null) titleMap[path] = avatarData.Title;
+                if (itemsByPath.TryGetValue(path, out var avatarData))
+                    titleMap[path] = avatarData.Title;
             }
 
             var remainingPaths = new HashSet<string>(supportedAvatars, StringComparer.OrdinalIgnoreCase);
@@ -200,7 +206,7 @@ namespace UnityEditorAssetBrowser.Helper
                 var titles = new List<string>();
                 foreach (var avatarPath in definition.Avatars)
                 {
-                    var title = GetAvatarTitle(items, avatarPath);
+                    var title = GetAvatarTitle(itemsByPath, avatarPath);
                     titles.Add(title);
                 }
 

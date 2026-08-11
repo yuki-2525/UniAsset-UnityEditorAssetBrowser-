@@ -6,6 +6,9 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditorAssetBrowser.Helper;
 using UnityEditorAssetBrowser.Interfaces;
@@ -21,6 +24,10 @@ namespace UnityEditorAssetBrowser.Views
     /// </summary>
     public class AssetItemView
     {
+        private static readonly Regex CompactParentPattern = new Regex(
+            @"^[a-z]\d+$",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+        private readonly Dictionary<string, string> _packageLabelCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         /// <summary>メモのフォールドアウト状態</summary>
         private readonly Dictionary<string, bool> _memoFoldouts = new();
 
@@ -47,7 +54,7 @@ namespace UnityEditorAssetBrowser.Views
             GUILayout.BeginVertical(GUIStyleManager.BoxStyle);
 
             DrawItemHeader(item);
-            DrawUnityPackageSection(item.GetItemPaths(), item.GetTitle(), item.GetImagePath(), item.GetCategory());
+            DrawUnityPackageSection(item.GetItemPaths(), item.GetTitle(), item.GetImagePath(), item.GetCategory(), item);
 
             GUILayout.EndVertical();
         }
@@ -286,20 +293,33 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="package">パッケージパス</param>
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="category">カテゴリ</param>
-        private void DrawUnityPackageItem(string package, string imagePath, string category)
+        private void CheckAndImportPackage(
+            string package,
+            string imagePath,
+            string category,
+            IDatabaseItem databaseItem,
+            bool? forceImportToCategoryFolder)
         {
-            string directory = Path.GetDirectoryName(package);
-            var parts = directory.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
-            string labelText;
+            BoothUpdateCheckService.CheckBeforeImport(
+                databaseItem,
+                () => UnityPackageServices.ImportPackageAndSetThumbnails(
+                    package,
+                    imagePath,
+                    category,
+                    forceImportToCategoryFolder));
+        }
 
-            // 親フォルダの1つ上がUUID（GUID）形式、または英小文字+数字形式の場合は、冗長なので表示を省略する
-            if (parts.Length >= 2 && (Guid.TryParse(parts[parts.Length - 2], out _) || System.Text.RegularExpressions.Regex.IsMatch(parts[parts.Length - 2], @"^[a-z]\d+$")))
+        private void DrawUnityPackageItem(string package, string imagePath, string category, IDatabaseItem databaseItem)
+        {
+            if (!_packageLabelCache.TryGetValue(package, out string labelText))
             {
-                labelText = parts.Last() + "/" + Path.GetFileName(package);
-            }
-            else
-            {
-                labelText = string.Join("/", parts.TakeLast(2)) + "/" + Path.GetFileName(package);
+                string directory = Path.GetDirectoryName(package) ?? string.Empty;
+                var parts = directory.Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+                labelText = parts.Length >= 2 &&
+                    (Guid.TryParse(parts[parts.Length - 2], out _) || CompactParentPattern.IsMatch(parts[parts.Length - 2]))
+                    ? parts.Last() + "/" + Path.GetFileName(package)
+                    : string.Join("/", parts.TakeLast(2)) + "/" + Path.GetFileName(package);
+                _packageLabelCache[package] = labelText;
             }
 
             // 幅計算（インデントやスクロールバーの余裕を考慮）
@@ -396,7 +416,8 @@ namespace UnityEditorAssetBrowser.Views
                     PackagePath = package,
                     PackageName = Path.GetFileName(package),
                     ThumbnailPath = imagePath,
-                    Category = category
+                    Category = category,
+                    DatabaseItem = databaseItem
                 };
                 DragAndDrop.SetGenericData("ImportQueueItem", item);
                 DragAndDrop.StartDrag(item.PackageName);
@@ -414,19 +435,19 @@ namespace UnityEditorAssetBrowser.Views
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_under_category")), false, () => 
                 {
                     DebugLogger.Log($"Context Menu: Import under category selected for {package}");
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, true);
+                    CheckAndImportPackage(package, imagePath, category, databaseItem, true);
                 });
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("import_directly")), false, () => 
                 {
                     DebugLogger.Log($"Context Menu: Import directly selected for {package}");
-                    UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, false);
+                    CheckAndImportPackage(package, imagePath, category, databaseItem, false);
                 });
                 
                 menu.AddSeparator("");
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
                 {
                     DebugLogger.Log($"Context Menu: Add to import list selected for {package}");
-                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
+                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category, databaseItem);
                     ImportQueueWindow.ShowWindow();
                 });
 
@@ -441,7 +462,7 @@ namespace UnityEditorAssetBrowser.Views
                 menu.AddItem(new GUIContent(LocalizationService.Instance.GetString("add_to_import_list") ?? "Add to Import List"), false, () => 
                 {
                     DebugLogger.Log($"Label Context Menu: Add to import list selected for {package}");
-                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category);
+                    ImportQueueService.Instance.Add(package, Path.GetFileName(package), imagePath, category, databaseItem);
                     ImportQueueWindow.ShowWindow();
                 });
                 menu.ShowAsContext();
@@ -465,7 +486,8 @@ namespace UnityEditorAssetBrowser.Views
                 // 左クリック（通常のボタン動作）
                 if (GUI.Button(buttonRect, buttonContent, GUIStyleManager.Button))
                 {
-                    DebugLogger.Log($"Import button clicked for {package}");   UnityPackageServices.ImportPackageAndSetThumbnails(package, imagePath, category, null);
+                    DebugLogger.Log($"Import button clicked for {package}");
+                    CheckAndImportPackage(package, imagePath, category, databaseItem, null);
                 }
             }
 
@@ -480,6 +502,8 @@ namespace UnityEditorAssetBrowser.Views
         private readonly Dictionary<string, string[]> _cachedUnitypackages = new Dictionary<string, string[]>();
         private readonly Dictionary<string, FileTypeGroup[]> _cachedFileTypeGroups = new Dictionary<string, FileTypeGroup[]>();
         private readonly Dictionary<string, PackageDisplayGroups> _cachedPackageDisplayGroups = new Dictionary<string, PackageDisplayGroups>();
+        private readonly HashSet<string> _pendingFileDiscoveries = new HashSet<string>();
+        private CancellationTokenSource _fileDiscoveryCancellation = new CancellationTokenSource();
         private string _cachedExtensionConfigurationSignature = string.Empty;
 
         private sealed class FileTypeGroup
@@ -513,7 +537,7 @@ namespace UnityEditorAssetBrowser.Views
         /// <param name="itemName">アイテム名</param>
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="category">カテゴリ</param>
-        private void DrawUnityPackageSection(string[] itemPaths, string itemName, string imagePath, string category)
+        private void DrawUnityPackageSection(string[] itemPaths, string itemName, string imagePath, string category, IDatabaseItem databaseItem)
         {
             string configurationSignature = AssetFileExtensionService.GetConfigurationSignature();
             if (!string.Equals(_cachedExtensionConfigurationSignature, configurationSignature, StringComparison.Ordinal))
@@ -524,16 +548,18 @@ namespace UnityEditorAssetBrowser.Views
                 _cachedExtensionConfigurationSignature = configurationSignature;
             }
 
-            string cacheKey = $"{itemName}|{configurationSignature}";
+            int pathHash = 17;
+            unchecked
+            {
+                foreach (string path in itemPaths ?? Array.Empty<string>())
+                    pathHash = pathHash * 31 + StringComparer.OrdinalIgnoreCase.GetHashCode(path ?? string.Empty);
+            }
+            string cacheKey = $"{itemName}|{pathHash:X8}|{configurationSignature}";
             if (!_cachedUnitypackages.TryGetValue(cacheKey, out var unityPackages))
             {
-                var searchExtensions = AssetFileExtensionService.GetSearchExtensions();
-                unityPackages = AssetFileServices.FindFilesFromPaths(itemPaths ?? Array.Empty<string>(), searchExtensions)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(path => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(path)))
-                    .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
-                    .ToArray();
-                _cachedUnitypackages.Add(cacheKey, unityPackages);
+                if (_pendingFileDiscoveries.Add(cacheKey))
+                    _ = DiscoverFilesAsync(cacheKey, itemPaths ?? Array.Empty<string>());
+                return;
             }
 
             if (unityPackages.Length == 0) return;
@@ -551,7 +577,32 @@ namespace UnityEditorAssetBrowser.Views
 
             foreach (var fileGroup in fileGroups)
             {
-                DrawFileTypeSection(fileGroup.Files, itemName, imagePath, category, fileGroup.TypeKey, cacheKey);
+                DrawFileTypeSection(fileGroup.Files, itemName, imagePath, category, fileGroup.TypeKey, cacheKey, databaseItem);
+            }
+        }
+
+        private async Task DiscoverFilesAsync(string cacheKey, string[] itemPaths)
+        {
+            try
+            {
+                var files = await AssetFileServices.FindFilesFromPathsAsync(
+                    itemPaths,
+                    AssetFileExtensionService.GetSearchExtensions(),
+                    _fileDiscoveryCancellation.Token);
+                files = files
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(path => AssetFileExtensionService.GetExtensionOrderIndex(Path.GetExtension(path)))
+                    .ThenBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
+                _cachedUnitypackages[cacheKey] = files;
+                if (EditorWindow.focusedWindow != null) EditorWindow.focusedWindow.Repaint();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            finally
+            {
+                _pendingFileDiscoveries.Remove(cacheKey);
             }
         }
 
@@ -564,7 +615,8 @@ namespace UnityEditorAssetBrowser.Views
             string imagePath,
             string category,
             string fileTypeKey,
-            string fileCacheKey)
+            string fileCacheKey,
+            IDatabaseItem databaseItem)
         {
             if (unityPackages.Length == 0) return;
 
@@ -630,7 +682,7 @@ namespace UnityEditorAssetBrowser.Views
 
                         for (int i = 0; i < materialPackages.Length; i++)
                         {
-                            DrawItemFile(materialPackages[i], imagePath, category);
+                            DrawItemFile(materialPackages[i], imagePath, category, databaseItem);
 
                             if (i < materialPackages.Length - 1)
                             {
@@ -651,7 +703,7 @@ namespace UnityEditorAssetBrowser.Views
                     // その他のパッケージの描画
                     for (int i = 0; i < otherPackages.Length; i++)
                     {
-                        DrawItemFile(otherPackages[i], imagePath, category);
+                        DrawItemFile(otherPackages[i], imagePath, category, databaseItem);
 
                         if (i < otherPackages.Length - 1)
                         {
@@ -744,18 +796,18 @@ namespace UnityEditorAssetBrowser.Views
             }
         }
 
-        private void DrawItemFile(string filePath, string imagePath, string category)
+        private void DrawItemFile(string filePath, string imagePath, string category, IDatabaseItem databaseItem)
         {
             if (string.Equals(Path.GetExtension(filePath), ".unitypackage", StringComparison.OrdinalIgnoreCase))
             {
-                DrawUnityPackageItem(filePath, imagePath, category);
+                DrawUnityPackageItem(filePath, imagePath, category, databaseItem);
                 return;
             }
 
-            DrawOtherFileItem(filePath);
+            DrawOtherFileItem(filePath, databaseItem);
         }
 
-        private void DrawOtherFileItem(string filePath)
+        private void DrawOtherFileItem(string filePath, IDatabaseItem databaseItem)
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
             EditorGUILayout.LabelField(new GUIContent(Path.GetFileName(filePath), filePath), GUIStyleManager.Label);
@@ -779,9 +831,11 @@ namespace UnityEditorAssetBrowser.Views
                             LocalizationService.Instance.GetString("ok"),
                             LocalizationService.Instance.GetString("cancel"));
 
-                    if (canCopy && AssetFileServices.CopyToFolder(filePath, destinationFolder, out _))
+                    if (canCopy)
                     {
-                        AssetDatabase.Refresh();
+                        BoothUpdateCheckService.CheckBeforeImport(
+                            databaseItem,
+                            () => CopyFileToFolder(filePath, destinationFolder));
                     }
                 }
             }
@@ -798,15 +852,26 @@ namespace UnityEditorAssetBrowser.Views
             EditorGUILayout.EndHorizontal();
             EditorGUILayout.EndVertical();
         }
+
+        private static void CopyFileToFolder(string filePath, string destinationFolder)
+        {
+            if (AssetFileServices.CopyToFolder(filePath, destinationFolder, out _))
+                AssetDatabase.Refresh();
+        }
         
         /// <summary>
         /// アイテムファイルのキャッシュをリセットします。
         /// </summary>
         public void ResetUnitypackageCache()
         {
+            _fileDiscoveryCancellation.Cancel();
+            _fileDiscoveryCancellation.Dispose();
+            _fileDiscoveryCancellation = new CancellationTokenSource();
+            _pendingFileDiscoveries.Clear();
             _cachedUnitypackages.Clear();
             _cachedFileTypeGroups.Clear();
             _cachedPackageDisplayGroups.Clear();
+            _packageLabelCache.Clear();
         }
     }
 }

@@ -21,6 +21,7 @@ namespace UnityEditorAssetBrowser.Services
         private const string PREF_KEY = "UniAsset_Language";
         private const string DEFAULT_LANGUAGE = "ja-JP";
         private const string FALLBACK_LANGUAGE = "en-US";
+        private string[] _availableLanguages = new string[] { DEFAULT_LANGUAGE };
 
         public event Action OnLanguageChanged;
 
@@ -39,7 +40,7 @@ namespace UnityEditorAssetBrowser.Services
             }
         }
 
-        public string[] AvailableLanguages => _localizedText?.Keys.OrderBy(k => k).ToArray() ?? new string[] { DEFAULT_LANGUAGE };
+        public string[] AvailableLanguages => _availableLanguages;
 
         private LocalizationService()
         {
@@ -95,6 +96,8 @@ namespace UnityEditorAssetBrowser.Services
                     }
                 }
             }
+
+            _availableLanguages = _localizedText.Keys.OrderBy(k => k).ToArray();
         }
 
         public string GetString(string key)
