@@ -7,7 +7,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
+using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEditorAssetBrowser.Interfaces;
@@ -37,6 +38,9 @@ namespace UnityEditorAssetBrowser.Services
 
         /// <summary>キャッシュの最大容量 (バイト) - デフォルト 512MB</summary>
         private const long MAX_CACHE_MEMORY_SIZE = 512L * 1024L * 1024L;
+        private const int MAX_MAIN_THREAD_ACTIONS_PER_FRAME = 2;
+        private const double MAX_MAIN_THREAD_MILLISECONDS = 4.0;
+        private readonly SemaphoreSlim _fileReadSemaphore = new SemaphoreSlim(4, 4);
 
         /// <summary>現在のキャッシュ使用量 (バイト)</summary>
         private long _currentCacheMemoryUsage = 0;
@@ -58,6 +62,8 @@ namespace UnityEditorAssetBrowser.Services
 
         /// <summary>現在読み込み中の画像パス</summary>
         private readonly HashSet<string> _loadingImages = new HashSet<string>();
+        private readonly Dictionary<string, double> _failedImages = new Dictionary<string, double>();
+        private const double FAILED_IMAGE_RETRY_SECONDS = 30.0;
 
         /// <summary>プレースホルダーテクスチャ</summary>
         private Texture2D? _placeholderTexture;
@@ -121,57 +127,8 @@ namespace UnityEditorAssetBrowser.Services
                 return _placeholderTexture;
             }
 
-            // 即座に同期読み込みを試行（小さいファイル用）
-            if (TryLoadSmallImageSync(path, out var texture))
-            {
-                // DebugLogger.Log($"Loaded small image sync: {path}");
-                return texture;
-            }
-
-            // 大きいファイルは非同期読み込み
-            // DebugLogger.Log($"Start loading large/async: {path}");
             LoadTextureAsync(path, priority: 1);
             return _placeholderTexture;
-        }
-
-        /// <summary>
-        /// 小さい画像の同期読み込みを試行
-        /// </summary>
-        private bool TryLoadSmallImageSync(string path, out Texture2D? texture)
-        {
-            texture = null;
-            
-            try
-            {
-                if (!File.Exists(path)) return false;
-
-                var fileInfo = new FileInfo(path);
-                if (fileInfo.Length > 2 * 1024 * 1024) return false; // 2MB以下のファイルは同期読み込み
-                
-                var bytes = File.ReadAllBytes(path);
-                texture = new Texture2D(2, 2);
-                
-                if (ImageConversion.LoadImage(texture, bytes))
-                {
-                    AddToCache(path, texture);
-                    return true;
-                }
-                else
-                {
-                    UnityEngine.Object.DestroyImmediate(texture);
-                    texture = null;
-                    return false;
-                }
-            }
-            catch
-            {
-                if (texture != null)
-                {
-                    UnityEngine.Object.DestroyImmediate(texture);
-                    texture = null;
-                }
-                return false;
-            }
         }
 
         /// <summary>
@@ -180,7 +137,9 @@ namespace UnityEditorAssetBrowser.Services
         private void ProcessMainThreadQueue()
         {
             var processCount = 0;
-            while (processCount < 10) // 1フレームで最大10個処理
+            var stopwatch = Stopwatch.StartNew();
+            while (processCount < MAX_MAIN_THREAD_ACTIONS_PER_FRAME &&
+                   stopwatch.Elapsed.TotalMilliseconds < MAX_MAIN_THREAD_MILLISECONDS)
             {
                 Action? action = null;
                 lock (_queueLock)
@@ -201,45 +160,63 @@ namespace UnityEditorAssetBrowser.Services
         /// <summary>
         /// 大きい画像の非同期読み込み（Task.Run版）
         /// </summary>
-        private void LoadLargeImageAsync(string path, Action<Texture2D?>? onComplete)
+        private async Task LoadLocalImageAsync(string path, Action<Texture2D?>? onComplete)
         {
-            // DebugLogger.Log($"Async load started (Task): {path}");
+            await _fileReadSemaphore.WaitAsync();
+            bool releaseOnWorker = true;
             try
             {
                 if (!File.Exists(path))
                 {
-                    lock (_queueLock)
-                    {
-                        _mainThreadQueue.Enqueue(() =>
-                        {
-                            lock (_lockObject) { _loadingImages.Remove(path); }
-                            onComplete?.Invoke(null);
-                        });
-                    }
+                    EnqueueLoadFailure(path, onComplete);
                     return;
                 }
 
-                var bytes = File.ReadAllBytes(path);
+                var bytes = await Task.Run(() => File.ReadAllBytes(path));
                 
                 // メインスレッドでテクスチャ作成
                 lock (_queueLock)
                 {
                     _mainThreadQueue.Enqueue(() => {
-                        CreateTextureFromBytesSync(path, bytes, onComplete);
+                        try
+                        {
+                            CreateTextureFromBytesSync(path, bytes, onComplete);
+                        }
+                        finally
+                        {
+                            _fileReadSemaphore.Release();
+                        }
                     });
                 }
+                // Keep the slot until texture creation releases the source byte array. This
+                // prevents fast disks from filling the main-thread queue with image buffers.
+                releaseOnWorker = false;
             }
             catch (Exception ex)
             {
                 DebugLogger.LogError(string.Format(LocalizationService.Instance.GetString("error_large_image_load_failed"), path, ex.Message));
+                EnqueueLoadFailure(path, onComplete);
+            }
+            finally
+            {
+                if (releaseOnWorker) _fileReadSemaphore.Release();
+            }
+        }
 
-                lock (_queueLock)
+        private void EnqueueLoadFailure(string path, Action<Texture2D?>? onComplete)
+        {
+            lock (_queueLock)
+            {
+                _mainThreadQueue.Enqueue(() =>
                 {
-                    _mainThreadQueue.Enqueue(() => {
-                        lock (_lockObject) { _loadingImages.Remove(path); }
-                        onComplete?.Invoke(null);
-                    });
-                }
+                    lock (_lockObject)
+                    {
+                        _loadingImages.Remove(path);
+                        _failedImages[path] = EditorApplication.timeSinceStartup;
+                    }
+                    onComplete?.Invoke(null);
+                    if (EditorWindow.focusedWindow != null) EditorWindow.focusedWindow.Repaint();
+                });
             }
         }
 
@@ -307,6 +284,16 @@ namespace UnityEditorAssetBrowser.Services
                     return;
                 }
 
+                if (_failedImages.TryGetValue(path, out double failedAt))
+                {
+                    if (EditorApplication.timeSinceStartup - failedAt < FAILED_IMAGE_RETRY_SECONDS)
+                    {
+                        onComplete?.Invoke(null);
+                        return;
+                    }
+                    _failedImages.Remove(path);
+                }
+
                 _loadingImages.Add(path);
             }
 
@@ -316,8 +303,7 @@ namespace UnityEditorAssetBrowser.Services
             }
             else
             {
-                // 大きいファイルは直接Task.Runで処理
-                Task.Run(() => LoadLargeImageAsync(path, onComplete));
+                _ = LoadLocalImageAsync(path, onComplete);
             }
         }
 
@@ -385,6 +371,7 @@ namespace UnityEditorAssetBrowser.Services
                 _nodeMap.Clear();
                 _currentVisibleImages.Clear();
                 _loadingImages.Clear();
+                _failedImages.Clear();
                 _currentCacheMemoryUsage = 0;
             }
         }
@@ -435,7 +422,7 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public void UpdateVisibleImages(IEnumerable<IDatabaseItem> visibleItems)
         {
-            var newVisibleImages = new HashSet<string>();
+            var newVisibleImages = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             // 新しく表示されるアイテムの画像パス収集
             foreach (var item in visibleItems)
@@ -469,6 +456,7 @@ namespace UnityEditorAssetBrowser.Services
             
             lock (_lockObject)
             {
+                if (_currentVisibleImages.SetEquals(newVisibleImages)) return;
                 _currentVisibleImages.Clear();
                 foreach (var path in newVisibleImages)
                 {
@@ -476,14 +464,6 @@ namespace UnityEditorAssetBrowser.Services
                 }
             }
 
-            // 表示中画像の読み込み完了後にEditorWindowを再描画
-            if (newVisibleImages.Any())
-            {
-                EditorApplication.delayCall += () =>
-                {
-                    if (EditorWindow.focusedWindow != null) EditorWindow.focusedWindow.Repaint();
-                };
-            }
         }
 
         /// <summary>
@@ -505,8 +485,10 @@ namespace UnityEditorAssetBrowser.Services
                 // キャッシュサイズ制限チェック (容量ベース)
                 while (_currentCacheMemoryUsage + textureSize > MAX_CACHE_MEMORY_SIZE && ImageCache.Count > 0)
                 {
-                    RemoveOldestItem();
+                    if (!RemoveOldestItem()) break;
                 }
+
+                if (ImageCache.ContainsKey(path)) RemoveFromCache(path);
 
                 var node = _accessOrder.AddLast(path);
                 ImageCache[path] = texture;
@@ -533,12 +515,15 @@ namespace UnityEditorAssetBrowser.Services
         /// <summary>
         /// 最も古いアイテムをキャッシュから削除
         /// </summary>
-        private void RemoveOldestItem()
+        private bool RemoveOldestItem()
         {
-            if (_accessOrder.First == null) return;
+            var node = _accessOrder.First;
+            while (node != null && _currentVisibleImages.Contains(node.Value))
+                node = node.Next;
 
-            var oldestPath = _accessOrder.First.Value;
-            RemoveFromCache(oldestPath);
+            if (node == null) return false;
+            RemoveFromCache(node.Value);
+            return true;
         }
         
         /// <summary>

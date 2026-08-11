@@ -17,6 +17,11 @@ namespace UnityEditorAssetBrowser.Services
     {
         private const string PREFS_KEY_EXCLUDE_FOLDERS = "UnityEditorAssetBrowser_ExcludeFolders";
         private const string PREFS_KEY_EXCLUDE_FOLDERS_COMBINED = "UnityEditorAssetBrowser_ExcludeFolders_Combined";
+        private static readonly char[] RegexCharacters = ".*+?^${}()|[]\\".ToCharArray();
+        private static readonly HashSet<string> ExactPatterns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly List<Regex> RegexPatterns = new List<Regex>();
+        private static List<string> _combinedPatterns = new List<string>();
+        private static bool _cacheInitialized;
 
         // デフォルト除外フォルダ（s?付き正規表現）
         private static readonly List<string> DefaultExcludePatterns = new List<string>
@@ -47,31 +52,12 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public static bool IsExcludedFolder(string folderName)
         {
-            var patterns = GetCombinedExcludePatterns();
+            EnsurePatternCache();
             string normalizedFolderName = Normalize(folderName);
 
-            foreach (var pattern in patterns)
-            {
-                if (string.IsNullOrEmpty(pattern)) continue;
-
-                string normalizedPattern = Normalize(pattern);
-
-                try
-                {
-                    if (IsRegexPattern(normalizedPattern) && Regex.IsMatch(normalizedFolderName, normalizedPattern, RegexOptions.IgnoreCase))
-                    {
-                        return true;
-                    }
-                    else if (string.Equals(normalizedFolderName, normalizedPattern, StringComparison.OrdinalIgnoreCase))
-                    {
-                        return true;
-                    }
-                }
-                catch
-                {
-                    // 無効な正規表現は無視
-                }
-            }
+            if (ExactPatterns.Contains(normalizedFolderName)) return true;
+            foreach (var regex in RegexPatterns)
+                if (regex.IsMatch(normalizedFolderName)) return true;
 
             return false;
         }
@@ -93,13 +79,11 @@ namespace UnityEditorAssetBrowser.Services
             return result;
         }
 
-        private const string RegexChars = @".*+?^${}()|[]\\";
-
         /// <summary>
         /// 正規表現かどうかを判定する（特殊文字が含まれていれば正規表現とみなす）
         /// </summary>
         public static bool IsRegexPattern(string pattern)
-            => pattern.IndexOfAny(RegexChars.ToCharArray()) >= 0;
+            => pattern.IndexOfAny(RegexCharacters) >= 0;
 
         /// <summary>
         /// 除外判定用に空白・全角空白・アンダースコアを除去
@@ -164,6 +148,8 @@ namespace UnityEditorAssetBrowser.Services
                     EditorPrefs.SetString(PREFS_KEY_EXCLUDE_FOLDERS, json);
                 }
             }
+
+            InvalidateCache();
         }
 
         /// <summary>
@@ -206,6 +192,7 @@ namespace UnityEditorAssetBrowser.Services
             });
 
             EditorPrefs.SetString(PREFS_KEY_EXCLUDE_FOLDERS, jsonString);
+            RebuildPatternCache(userFolders.Concat(enabledDefaults));
         }
 
         /// <summary>
@@ -216,6 +203,7 @@ namespace UnityEditorAssetBrowser.Services
             
             string json = JsonUtility.ToJson(new StringListWrapper { list = combined });
             EditorPrefs.SetString(PREFS_KEY_EXCLUDE_FOLDERS_COMBINED, json);
+            RebuildPatternCache(combined);
         }
 
         /// <summary>
@@ -223,18 +211,70 @@ namespace UnityEditorAssetBrowser.Services
         /// </summary>
         public static List<string> GetCombinedExcludePatterns()
         {
+            EnsurePatternCache();
+            return new List<string>(_combinedPatterns);
+        }
+
+        public static void InvalidateCache()
+        {
+            _cacheInitialized = false;
+            ExactPatterns.Clear();
+            RegexPatterns.Clear();
+            _combinedPatterns.Clear();
+        }
+
+        private static void EnsurePatternCache()
+        {
+            if (_cacheInitialized) return;
+
             string json = EditorPrefs.GetString(PREFS_KEY_EXCLUDE_FOLDERS_COMBINED, "");
-            if (string.IsNullOrEmpty(json)) return new List<string>();
+            if (string.IsNullOrEmpty(json))
+            {
+                RebuildPatternCache(Array.Empty<string>());
+                return;
+            }
 
             try
             {
                 var data = JsonUtility.FromJson<StringListWrapper>(json);
-                return data?.list ?? new List<string>();
+                RebuildPatternCache(data?.list ?? new List<string>());
             }
             catch
             {
-                return new List<string>();
+                RebuildPatternCache(Array.Empty<string>());
             }
+        }
+
+        private static void RebuildPatternCache(IEnumerable<string> patterns)
+        {
+            ExactPatterns.Clear();
+            RegexPatterns.Clear();
+            _combinedPatterns = patterns.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+            foreach (var pattern in _combinedPatterns)
+            {
+                string normalized = Normalize(pattern);
+                if (string.IsNullOrEmpty(normalized)) continue;
+
+                if (!IsRegexPattern(normalized))
+                {
+                    ExactPatterns.Add(normalized);
+                    continue;
+                }
+
+                try
+                {
+                    RegexPatterns.Add(new Regex(
+                        normalized,
+                        RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled));
+                }
+                catch (ArgumentException)
+                {
+                    // 無効な正規表現は従来どおり無視する。
+                }
+            }
+
+            _cacheInitialized = true;
         }
 
         [Serializable]

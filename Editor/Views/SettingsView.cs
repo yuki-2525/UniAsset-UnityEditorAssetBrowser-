@@ -60,13 +60,28 @@ namespace UnityEditorAssetBrowser.Views
         /// <summary>
         /// カテゴリに設定可能なアセットタイプのリスト（ローカライズ済み）
         /// </summary>
-        private string[] AssetTypeOptions => new[]
+        private string[] _assetTypeOptions = Array.Empty<string>();
+        private string _assetTypeOptionsLanguage = string.Empty;
+        private string[] AssetTypeOptions
         {
-            LocalizationService.Instance.GetString("tab_avatar"),
-            LocalizationService.Instance.GetString("tab_avatar_assets"),
-            LocalizationService.Instance.GetString("tab_world_assets"),
-            LocalizationService.Instance.GetString("tab_others"),
-        };
+            get
+            {
+                string language = LocalizationService.Instance.CurrentLanguage;
+                if (!string.Equals(_assetTypeOptionsLanguage, language, StringComparison.Ordinal))
+                {
+                    _assetTypeOptionsLanguage = language;
+                    _assetTypeOptions = new[]
+                    {
+                        LocalizationService.Instance.GetString("tab_avatar"),
+                        LocalizationService.Instance.GetString("tab_avatar_assets"),
+                        LocalizationService.Instance.GetString("tab_world_assets"),
+                        LocalizationService.Instance.GetString("tab_others"),
+                    };
+                }
+
+                return _assetTypeOptions;
+            }
+        }
 
         /// <summary>
         /// カテゴリごとのアセットタイプ設定を保持する辞書
@@ -77,6 +92,9 @@ namespace UnityEditorAssetBrowser.Views
         /// BOOTHLMのカテゴリごとのアセットタイプ設定を保持する辞書
         /// </summary>
         private readonly Dictionary<string, int> _boothlmCategoryAssetTypes = new Dictionary<string, int>();
+        private readonly Dictionary<string, int> _aeCategoryCounts = new Dictionary<string, int>();
+        private readonly Dictionary<string, int> _kaCategoryCounts = new Dictionary<string, int>();
+        private readonly Dictionary<string, int> _boothlmCategoryCounts = new Dictionary<string, int>();
 
         /// <summary>
         /// EditorPrefsに保存する際のキーのプレフィックス
@@ -124,8 +142,40 @@ namespace UnityEditorAssetBrowser.Views
             
             ExcludeFolderService.InitializeDefaultExcludeFolders();
             InitializeCategoryAssetTypes();
+            BuildCategorySummaries();
             InitializeSettingsVisibility();
             InitializeExcludeFolders();
+        }
+
+        private void BuildCategorySummaries()
+        {
+            _aeCategoryCounts.Clear();
+            _kaCategoryCounts.Clear();
+            _boothlmCategoryCounts.Clear();
+
+            var aeDatabase = DatabaseService.GetAEDatabase();
+            if (aeDatabase != null)
+                foreach (var item in aeDatabase.Items) Increment(_aeCategoryCounts, GetAECategoryKey(item));
+
+            var kaDatabase = DatabaseService.GetKADatabase();
+            if (kaDatabase != null)
+                foreach (var item in kaDatabase.Items) Increment(_kaCategoryCounts, item.GetCategory());
+
+            var boothlmDatabase = DatabaseService.GetBOOTHLMDatabase();
+            if (boothlmDatabase != null)
+                foreach (var item in boothlmDatabase.Items) Increment(_boothlmCategoryCounts, item.CategoryName);
+        }
+
+        public void RefreshDatabaseSummaries()
+        {
+            InitializeCategoryAssetTypes();
+            BuildCategorySummaries();
+        }
+
+        private static void Increment(Dictionary<string, int> counts, string key)
+        {
+            counts.TryGetValue(key, out int count);
+            counts[key] = count + 1;
         }
 
         /// <summary>
@@ -277,6 +327,7 @@ namespace UnityEditorAssetBrowser.Views
             combined.AddRange(_enabledDefaultExcludeFolders);
 
             ExcludeFolderService.SaveCombinedExcludePatterns(combined);
+            FolderIconDrawer.ScheduleIndexRebuild();
         }
 
         [Serializable]
@@ -428,6 +479,7 @@ namespace UnityEditorAssetBrowser.Views
                 if (newIconSizeIndex != iconSizeIndex)
                 {
                     EditorPrefs.SetInt(PREFS_KEY_ICON_SIZE, _iconSizes[newIconSizeIndex]);
+                    GUIStyleManager.InvalidatePreferenceCache();
                     OnSettingsChanged?.Invoke();
                 }
                 EditorGUILayout.EndHorizontal();
@@ -444,6 +496,7 @@ namespace UnityEditorAssetBrowser.Views
                 if (newFontSizeIndex != fontSizeIndex)
                 {
                     EditorPrefs.SetInt(PREFS_KEY_FONT_SIZE, _fontSizes[newFontSizeIndex]);
+                    GUIStyleManager.InvalidatePreferenceCache();
                     OnSettingsChanged?.Invoke();
                 }
                 EditorGUILayout.EndHorizontal();
@@ -495,18 +548,10 @@ namespace UnityEditorAssetBrowser.Views
 
                         if (_showAECategories)
                         {
-                            var aeCategories = new HashSet<string>();
-                            foreach (var item in aeDatabase.Items)
-                            {
-                                aeCategories.Add(GetAECategoryKey(item));
-                            }
-
                             // 指定された順序のカテゴリを表示
                             foreach (var categoryKey in _orderedCategories)
                             {
-                                if (!aeCategories.Contains(categoryKey)) continue;
-
-                                int count = aeDatabase.Items.Count(item => GetAECategoryKey(item) == categoryKey);
+                                if (!_aeCategoryCounts.TryGetValue(categoryKey, out int count)) continue;
                                 if (count > 0)
                                 {
                                     DrawCategorySettingRow(categoryKey, GetCategoryLabel(categoryKey), count, _categoryAssetTypes, SaveCategoryAssetType);
@@ -514,14 +559,13 @@ namespace UnityEditorAssetBrowser.Views
                             }
 
                             // その他のカテゴリを表示
-                            var otherCategories = aeCategories
+                            var otherCategories = _aeCategoryCounts.Keys
                                 .Where(category => !_orderedCategories.Contains(category))
                                 .OrderBy(category => category);
 
                             foreach (var category in otherCategories)
                             {
-                                int count = aeDatabase.Items.Count(item => GetAECategoryKey(item) == category);
-                                DrawCategorySettingRow(category, GetCategoryLabel(category), count, _categoryAssetTypes, SaveCategoryAssetType);
+                                DrawCategorySettingRow(category, GetCategoryLabel(category), _aeCategoryCounts[category], _categoryAssetTypes, SaveCategoryAssetType);
                             }
                         }
                         EditorGUILayout.Space(10);
@@ -538,15 +582,11 @@ namespace UnityEditorAssetBrowser.Views
 
                         if (_showKACategories)
                         {
-                            var kaCategories = kaDatabase.Items
-                                .Select(item => item.GetCategory())
-                                .Distinct()
-                                .OrderBy(c => c);
+                            var kaCategories = _kaCategoryCounts.Keys.OrderBy(c => c);
 
                             foreach (var category in kaCategories)
                             {
-                                int count = kaDatabase.Items.Count(item => item.GetCategory() == category);
-                                DrawCategorySettingRow(category, category, count, _categoryAssetTypes, SaveCategoryAssetType, false);
+                                DrawCategorySettingRow(category, category, _kaCategoryCounts[category], _categoryAssetTypes, SaveCategoryAssetType, false);
                             }
                         }
                         EditorGUILayout.Space(10);
@@ -563,10 +603,7 @@ namespace UnityEditorAssetBrowser.Views
 
                         if (_showBOOTHLMCategories)
                         {
-                            var categories = boothlmDatabase.Items
-                                .Select(item => item.CategoryName)
-                                .Distinct()
-                                .OrderBy(c => c);
+                            var categories = _boothlmCategoryCounts.Keys.OrderBy(c => c);
 
                             foreach (var category in categories)
                             {
@@ -575,8 +612,7 @@ namespace UnityEditorAssetBrowser.Views
                                     _boothlmCategoryAssetTypes[category] = GetDefaultBOOTHLMAssetType(category);
                                 }
 
-                                var items = boothlmDatabase.Items.Where(i => i.CategoryName == category).ToList();
-                                DrawCategorySettingRow(category, category, items.Count, _boothlmCategoryAssetTypes, SaveBOOTHLMCategoryAssetType);
+                                DrawCategorySettingRow(category, category, _boothlmCategoryCounts[category], _boothlmCategoryAssetTypes, SaveBOOTHLMCategoryAssetType);
                             }
                         }
                     }

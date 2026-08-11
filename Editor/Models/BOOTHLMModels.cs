@@ -55,6 +55,9 @@ namespace UnityEditorAssetBrowser.Models
         public DateTime UpdatedAt { get; set; }
         public bool IsAdult { get; set; }
         public List<string> Tags { get; set; } = new List<string>();
+        private string[]? _cachedTags;
+        private string[]? _cachedItemPaths;
+        private string _cachedItemPathRoot = string.Empty;
 
         // IDatabaseItem の実装
         public string GetTitle() => Name;
@@ -69,7 +72,16 @@ namespace UnityEditorAssetBrowser.Models
             return Path.GetFullPath(Path.Combine(basePath, RegisteredId));
         }
 
-        public string[] GetItemPaths() => new[] { GetItemPath() };
+        public string[] GetItemPaths()
+        {
+            string root = DatabaseService.GetBOOTHLMDataPath();
+            if (_cachedItemPaths == null || !string.Equals(root, _cachedItemPathRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                _cachedItemPathRoot = root;
+                _cachedItemPaths = new[] { GetItemPath() };
+            }
+            return _cachedItemPaths;
+        }
 
         public string GetImagePath()
         {
@@ -80,7 +92,11 @@ namespace UnityEditorAssetBrowser.Models
         public string[] GetSupportedAvatars() => Array.Empty<string>();
         public int GetBoothId() => Id;
         public string GetCategory() => CategoryName;
-        public string[] GetTags() => Tags.ToArray();
+        public string[] GetTags()
+        {
+            if (_cachedTags == null || _cachedTags.Length != Tags.Count) _cachedTags = Tags.ToArray();
+            return _cachedTags;
+        }
         public DateTime GetCreatedDate() => CreatedAt;
         public DateTime GetUpdatedDate() => UpdatedAt;
     }

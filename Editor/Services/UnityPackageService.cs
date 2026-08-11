@@ -74,10 +74,25 @@ namespace UnityEditorAssetBrowser.Services
         /// <param name="forceImportToCategoryFolder">カテゴリフォルダへのインポートを強制するかどうか（nullの場合は設定に従う）</param>
         /// <param name="showDialog">インポートダイアログを表示するかどうか（nullの場合は設定に従う）</param>
         /// <param name="onPreImportError">インポート開始前のエラー通知コールバック</param>
-        public static async void ImportPackageAndSetThumbnails(
+        public static void ImportPackageAndSetThumbnails(
             string packagePath, 
             string imagePath, 
             string category, 
+            bool? forceImportToCategoryFolder = null,
+            bool? showDialog = null,
+            Action<string>? onPreImportError = null)
+            => _ = ImportPackageAndSetThumbnailsAsync(
+                packagePath,
+                imagePath,
+                category,
+                forceImportToCategoryFolder,
+                showDialog,
+                onPreImportError);
+
+        public static async Task ImportPackageAndSetThumbnailsAsync(
+            string packagePath,
+            string imagePath,
+            string category,
             bool? forceImportToCategoryFolder = null,
             bool? showDialog = null,
             Action<string>? onPreImportError = null)
@@ -293,7 +308,10 @@ namespace UnityEditorAssetBrowser.Services
         /// <param name="folders">フォルダパスのリスト</param>
         /// <param name="imagePath">サムネイル画像パス</param>
         /// <param name="direct">指定されたフォルダに直接設定するかどうか</param>
-        public static async void SetFolderThumbnails(List<string> folders, string imagePath, bool direct = false)
+        public static void SetFolderThumbnails(List<string> folders, string imagePath, bool direct = false)
+            => _ = SetFolderThumbnailsAsync(folders, imagePath, direct);
+
+        public static async Task SetFolderThumbnailsAsync(List<string> folders, string imagePath, bool direct = false)
         {
             if (!ValidateInputParameters(folders, imagePath))
                 return;
@@ -342,6 +360,10 @@ namespace UnityEditorAssetBrowser.Services
                 }
 
                 CopyThumbnailsToTargetFolders(targetFolders, fullImagePath);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogError($"Failed to set folder thumbnails: {ex.Message}");
             }
             finally
             {

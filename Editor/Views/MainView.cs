@@ -43,6 +43,10 @@ namespace UnityEditorAssetBrowser.Views
         
         /// <summary> アイテムのキャッシュ</summary>
         private List<IDatabaseItem>? _cachedItems = null;
+        private List<IDatabaseItem> _cachedPageItems = new List<IDatabaseItem>();
+        private List<IDatabaseItem>? _pageSource;
+        private int _cachedPage = -1;
+        private int _cachedItemsPerPage = -1;
 
         /// <summary>
         /// コンストラクタ
@@ -69,17 +73,23 @@ namespace UnityEditorAssetBrowser.Views
             _assetBrowserViewModel = assetBrowserViewModel;
 
             // ページ切り替え時にスクロールを先頭へ戻す
-            _paginationViewModel.OnPageChanged += () => { _scrollPosition = Vector2.zero; };
+            _paginationViewModel.OnPageChanged += () =>
+            {
+                _scrollPosition = Vector2.zero;
+                InvalidatePageCache();
+            };
 
             _assetBrowserViewModel.SortMethodChanged += () =>
             {
                 if (_cachedItems == null) return;
                 _cachedItems = _assetBrowserViewModel.SortItems(_cachedItems);
+                InvalidatePageCache();
             };
 
             DatabaseService.OnPathChanged += () =>
             {
                 _cachedItems = null;
+                InvalidatePageCache();
             };
         }
 
@@ -100,6 +110,7 @@ namespace UnityEditorAssetBrowser.Views
             if (Event.current.type == EventType.Used || _cachedItems == null)
             {
                 _cachedItems = _searchView.GetSearchResult();
+                InvalidatePageCache();
             }
 
             if (_cachedItems != null)
@@ -278,12 +289,6 @@ namespace UnityEditorAssetBrowser.Views
             var totalCount = result.TotalCount;
             var previewItems = result.Items;
             
-            // 画像のロードをリクエスト
-            if (previewItems.Count > 0)
-            {
-                 ImageServices.Instance.UpdateVisibleImages(previewItems.Cast<IDatabaseItem>().ToList());
-            }
-
             // 描画設定
             int maxStack = 5;
             float overlapOffset = 20f;
@@ -347,15 +352,27 @@ namespace UnityEditorAssetBrowser.Views
         /// </summary>
         private void ShowContents(List<IDatabaseItem> totalItems)
         {
-            var pageItems = _paginationViewModel.GetCurrentPageItems(totalItems);
+            if (!ReferenceEquals(_pageSource, totalItems) ||
+                _cachedPage != _paginationViewModel.CurrentPage ||
+                _cachedItemsPerPage != _paginationViewModel.ItemsPerPage)
+            {
+                _pageSource = totalItems;
+                _cachedPage = _paginationViewModel.CurrentPage;
+                _cachedItemsPerPage = _paginationViewModel.ItemsPerPage;
+                _cachedPageItems = _paginationViewModel.GetCurrentPageItems(totalItems).ToList();
+                ImageServices.Instance.UpdateVisibleImages(_cachedPageItems);
+            }
 
-            // 表示前に必要な画像のみ読み込み
-            ImageServices.Instance.UpdateVisibleImages(pageItems);
-
-            foreach (var item in pageItems)
+            foreach (var item in _cachedPageItems)
             {
                 _assetItemView.ShowAvatarItem(item);
             }
+        }
+
+        private void InvalidatePageCache()
+        {
+            _pageSource = null;
+            _cachedPage = -1;
         }
     }
 }

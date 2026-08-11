@@ -8,8 +8,15 @@ namespace UnityEditorAssetBrowser.Helper
     public static class DebugLogger
     {
         private const string DEBUG_KEY = "UniAsset_DebugMode";
+        private static bool? _isDebugMode;
 
-        public static bool IsDebugMode => EditorPrefs.GetBool(DEBUG_KEY, false);
+        public static bool IsDebugMode => _isDebugMode ??= EditorPrefs.GetBool(DEBUG_KEY, false);
+
+        public static void SetDebugMode(bool enabled)
+        {
+            _isDebugMode = enabled;
+            EditorPrefs.SetBool(DEBUG_KEY, enabled);
+        }
 
         public static void Log(string message)
         {

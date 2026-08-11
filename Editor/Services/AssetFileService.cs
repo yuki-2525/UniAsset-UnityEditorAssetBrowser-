@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser.Services
@@ -30,6 +32,65 @@ namespace UnityEditorAssetBrowser.Services
                 .Where(path => !string.IsNullOrEmpty(path))
                 .SelectMany(path => FindFilesInternal(path, normalizedExtensions))
                 .ToArray();
+        }
+
+        public static Task<string[]> FindFilesFromPathsAsync(
+            IEnumerable<string> paths,
+            IEnumerable<string> extensions,
+            CancellationToken cancellationToken)
+        {
+            var pathSnapshot = (paths ?? Array.Empty<string>()).Where(x => !string.IsNullOrEmpty(x)).ToArray();
+            var normalizedExtensions = NormalizeExtensions(extensions);
+            return Task.Run(() => FindFilesRobust(pathSnapshot, normalizedExtensions, cancellationToken), cancellationToken);
+        }
+
+        private static string[] FindFilesRobust(
+            IEnumerable<string> paths,
+            HashSet<string> normalizedExtensions,
+            CancellationToken cancellationToken)
+        {
+            var results = new List<string>();
+            var pendingDirectories = new Stack<string>();
+
+            foreach (string path in paths)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (File.Exists(path))
+                {
+                    if (normalizedExtensions.Contains(Path.GetExtension(path))) results.Add(path);
+                }
+                else if (Directory.Exists(path)) pendingDirectories.Push(path);
+            }
+
+            while (pendingDirectories.Count > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                string directory = pendingDirectories.Pop();
+                try
+                {
+                    foreach (string file in Directory.EnumerateFiles(directory, "*", SearchOption.TopDirectoryOnly))
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (normalizedExtensions.Contains(Path.GetExtension(file))) results.Add(file);
+                    }
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is PathTooLongException)
+                {
+                    DebugLogger.LogWarning($"Could not enumerate files under {directory}: {ex.Message}");
+                }
+
+                try
+                {
+                    foreach (string child in Directory.EnumerateDirectories(directory, "*", SearchOption.TopDirectoryOnly))
+                        pendingDirectories.Push(child);
+                }
+                catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException || ex is PathTooLongException)
+                {
+                    DebugLogger.LogWarning($"Could not enumerate directories under {directory}: {ex.Message}");
+                }
+            }
+
+            return results.ToArray();
         }
 
         private static string[] FindFilesInternal(string path, HashSet<string> normalizedExtensions)

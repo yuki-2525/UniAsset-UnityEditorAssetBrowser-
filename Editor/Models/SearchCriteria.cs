@@ -13,6 +13,8 @@ namespace UnityEditorAssetBrowser.Models
     /// </summary>
     public class SearchCriteria
     {
+        private int _version;
+        internal int Version => _version;
         // 基本検索
         private string _searchQuery = "";
 
@@ -45,7 +47,7 @@ namespace UnityEditorAssetBrowser.Models
         public string SearchQuery
         {
             get => _searchQuery;
-            set => _searchQuery = value ?? "";
+            set => SetValue(ref _searchQuery, value ?? "");
         }
 
         /// <summary>
@@ -54,7 +56,12 @@ namespace UnityEditorAssetBrowser.Models
         public bool ShowAdvancedSearch
         {
             get => _showAdvancedSearch;
-            set => _showAdvancedSearch = value;
+            set
+            {
+                if (_showAdvancedSearch == value) return;
+                _showAdvancedSearch = value;
+                _version++;
+            }
         }
 
         /// <summary>
@@ -64,7 +71,7 @@ namespace UnityEditorAssetBrowser.Models
         public string TitleSearch
         {
             get => _titleSearch;
-            set => _titleSearch = value ?? "";
+            set => SetValue(ref _titleSearch, value ?? "");
         }
 
         /// <summary>
@@ -74,7 +81,7 @@ namespace UnityEditorAssetBrowser.Models
         public string AuthorSearch
         {
             get => _authorSearch;
-            set => _authorSearch = value ?? "";
+            set => SetValue(ref _authorSearch, value ?? "");
         }
 
         /// <summary>
@@ -84,7 +91,7 @@ namespace UnityEditorAssetBrowser.Models
         public string CategorySearch
         {
             get => _categorySearch;
-            set => _categorySearch = value ?? "";
+            set => SetValue(ref _categorySearch, value ?? "");
         }
 
         /// <summary>
@@ -94,7 +101,7 @@ namespace UnityEditorAssetBrowser.Models
         public string SupportedAvatarsSearch
         {
             get => _supportedAvatarsSearch;
-            set => _supportedAvatarsSearch = value ?? "";
+            set => SetValue(ref _supportedAvatarsSearch, value ?? "");
         }
 
         /// <summary>
@@ -104,7 +111,7 @@ namespace UnityEditorAssetBrowser.Models
         public string TagsSearch
         {
             get => _tagsSearch;
-            set => _tagsSearch = value ?? "";
+            set => SetValue(ref _tagsSearch, value ?? "");
         }
 
         /// <summary>
@@ -114,7 +121,7 @@ namespace UnityEditorAssetBrowser.Models
         public string MemoSearch
         {
             get => _memoSearch;
-            set => _memoSearch = value ?? "";
+            set => SetValue(ref _memoSearch, value ?? "");
         }
 
         /// <summary>
@@ -182,6 +189,13 @@ namespace UnityEditorAssetBrowser.Models
         }
 
         private static readonly char[] EmptyChars = new[] { ' ', '　' };
+
+        private void SetValue(ref string field, string value)
+        {
+            if (string.Equals(field, value, StringComparison.Ordinal)) return;
+            field = value;
+            _version++;
+        }
 
         /// <summary>
         /// 検索クエリをキーワード配列に分割

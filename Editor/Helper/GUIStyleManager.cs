@@ -17,6 +17,8 @@ namespace UnityEditorAssetBrowser.Helper
         private const string PREFS_KEY_FONT_SIZE = "UnityEditorAssetBrowser_FontSize";
 
         private static int _currentFontSize = -1;
+        private static int? _cachedIconSize;
+        private static int? _cachedFontSize;
         
         private static GUIStyle? _titleStyle;
         private static GUIStyle? _boxStyle;
@@ -33,12 +35,18 @@ namespace UnityEditorAssetBrowser.Helper
         /// <summary>
         /// 現在設定されているアイコンサイズ
         /// </summary>
-        public static int IconSize => EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 120);
+        public static int IconSize => _cachedIconSize ??= EditorPrefs.GetInt(PREFS_KEY_ICON_SIZE, 120);
 
         /// <summary>
         /// 現在設定されているフォントサイズ
         /// </summary>
-        public static int FontSize => EditorPrefs.GetInt(PREFS_KEY_FONT_SIZE, 13);
+        public static int FontSize => _cachedFontSize ??= EditorPrefs.GetInt(PREFS_KEY_FONT_SIZE, 13);
+
+        public static void InvalidatePreferenceCache()
+        {
+            _cachedIconSize = null;
+            _cachedFontSize = null;
+        }
 
         /// <summary>
         /// スタイルが現在のフォントサイズと一致しているか確認し、必要ならリセットする

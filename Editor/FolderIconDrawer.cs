@@ -3,375 +3,141 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using UnityEditor;
 using UnityEditorAssetBrowser.Services;
 using UnityEngine;
-using UnityEditorAssetBrowser.Helper;
 
 namespace UnityEditorAssetBrowser
 {
-    /// <summary>
-    /// フォルダ内の "FolderIcon.jpg" をプロジェクトウィンドウでのフォルダサムネイルとして描画するクラス
-    /// </summary>
     [InitializeOnLoad]
     public static class FolderIconDrawer
     {
-        // EditorPrefsのキー：フォルダアイコン表示設定
-        private const string PREFS_KEY_SHOW_FOLDER_THUMBNAIL = "UnityEditorAssetBrowser_ShowFolderThumbnail";
-        private const string PREFS_KEY_EXCLUDE_FOLDERS = "UnityEditorAssetBrowser_ExcludeFolders";
+        private const string ShowThumbnailKey = "UnityEditorAssetBrowser_ShowFolderThumbnail";
+        private const int MaxDepth = 4;
+        private static readonly Dictionary<string, List<string>> IconIndex =
+            new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, Texture2D> TextureCache =
+            new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, Texture2D[]> FolderTextureCache =
+            new Dictionary<string, Texture2D[]>(StringComparer.OrdinalIgnoreCase);
+        private static bool _registered;
+        private static bool _rebuildScheduled;
 
-        // 現在イベントが登録されているかどうかのフラグ
-        private static bool _isRegistered = false;
-
-        // キャッシュシステム
-        private static readonly Dictionary<string, FolderIconCache> _folderCache = new Dictionary<string, FolderIconCache>();
-        private static readonly Dictionary<string, Texture2D> _textureCache = new Dictionary<string, Texture2D>();
-        private static readonly Dictionary<string, bool> _directoryCache = new Dictionary<string, bool>();
-        private const int MAX_CACHE_SIZE = 1000;
-        private static int _cacheAccessCounter = 0;
-
-        private struct FolderIconCache
-        {
-            public List<string> IconPaths;
-            public long LastWriteTime;
-            public bool IsValid;
-        }
-
-        // 静的コンストラクタ：エディタ起動時に呼ばれる
         static FolderIconDrawer()
         {
-            // 起動時にEditorPrefsの値で初期化
-            SetEnabled(EditorPrefs.GetBool(PREFS_KEY_SHOW_FOLDER_THUMBNAIL, true));
-            
-            // キャッシュクリーンアップのためのイベント登録
-            EditorApplication.update += CleanupCacheIfNeeded;
+            SetEnabled(EditorPrefs.GetBool(ShowThumbnailKey, true));
         }
 
-        /// <summary>
-        /// フォルダアイコン描画の有効/無効を切り替える
-        /// </summary>
         public static void SetEnabled(bool enabled)
         {
-            if (enabled && !_isRegistered)
+            if (enabled && !_registered)
             {
-                Helper.DebugLogger.Log("FolderIconDrawer enabled.");
-                // 有効化：イベント登録
-                EditorApplication.projectWindowItemOnGUI -= OnProjectWindowItemGUI;
                 EditorApplication.projectWindowItemOnGUI += OnProjectWindowItemGUI;
-                _isRegistered = true;
+                _registered = true;
+                ScheduleIndexRebuild();
             }
-            else if (!enabled && _isRegistered)
+            else if (!enabled && _registered)
             {
-                Helper.DebugLogger.Log("FolderIconDrawer disabled.");
-                // 無効化：イベント解除
                 EditorApplication.projectWindowItemOnGUI -= OnProjectWindowItemGUI;
-                _isRegistered = false;
+                _registered = false;
             }
         }
 
-        /// <summary>
-        /// プロジェクトウィンドウの各アイテム描画コールバック
-        /// </summary>
+        internal static void ScheduleIndexRebuild()
+        {
+            if (_rebuildScheduled) return;
+            _rebuildScheduled = true;
+            EditorApplication.delayCall += RebuildIconIndex;
+        }
+
+        private static void RebuildIconIndex()
+        {
+            _rebuildScheduled = false;
+            IconIndex.Clear();
+            TextureCache.Clear();
+            FolderTextureCache.Clear();
+            if (!_registered) return;
+
+            foreach (string guid in AssetDatabase.FindAssets("FolderIcon t:Texture2D", new[] { "Assets" }))
+            {
+                string iconPath = AssetDatabase.GUIDToAssetPath(guid).Replace('\\', '/');
+                if (!string.Equals(Path.GetFileName(iconPath), "FolderIcon.jpg", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string current = (Path.GetDirectoryName(iconPath) ?? string.Empty).Replace('\\', '/');
+                for (int depth = 0; depth <= MaxDepth && !string.IsNullOrEmpty(current); depth++)
+                {
+                    if (ExcludeFolderService.IsExcludedFolder(Path.GetFileName(current))) break;
+                    if (!IconIndex.TryGetValue(current, out var icons))
+                        IconIndex[current] = icons = new List<string>(4);
+                    if (icons.Count < 4 && !icons.Contains(iconPath)) icons.Add(iconPath);
+                    if (string.Equals(current, "Assets", StringComparison.OrdinalIgnoreCase)) break;
+                    current = (Path.GetDirectoryName(current) ?? string.Empty).Replace('\\', '/');
+                }
+            }
+            EditorApplication.RepaintProjectWindow();
+        }
+
         private static void OnProjectWindowItemGUI(string guid, Rect rect)
         {
             if (Event.current.type != EventType.Repaint) return;
-
             string path = AssetDatabase.GUIDToAssetPath(guid);
-            if (string.IsNullOrEmpty(path)) return;
+            if (!IconIndex.TryGetValue(path, out var paths)) return;
 
-            // ディレクトリチェック（キャッシュ使用）
-            if (!IsDirectoryCached(path)) return;
+            var textures = GetTextures(path, paths);
+            if (textures.Length == 0) return;
+            Rect imageRect = rect.height > 20
+                ? new Rect(rect.x - 1, rect.y - 1, rect.width + 2, rect.width + 2)
+                : new Rect(rect.x + (rect.x > 20 ? -1 : 2), rect.y - 1, rect.height + 2, rect.height + 2);
 
-            // 除外フォルダ名判定
-            string folderName = Path.GetFileName(path);
-            if (ExcludeFolderService.IsExcludedFolder(folderName)) return;
-
-            // キャッシュからアイコンパスを取得
-            var iconPaths = GetIconPathsCached(path);
-            if (iconPaths == null || iconPaths.Count == 0) return;
-
-            // テクスチャをキャッシュから取得
-            var textures = GetTexturesCached(iconPaths);
-            if (textures.Count == 0) return;
-
-            // アイコン領域に合わせて描画矩形を計算
-            Rect imageRect;
-            if (rect.height > 20)
+            if (textures.Length == 1)
             {
-                // 一覧ビュー・大きいサムネイルビュー
-                imageRect = new Rect(rect.x - 1, rect.y - 1, rect.width + 2, rect.width + 2);
-            }
-            else if (rect.x > 20)
-            {
-                // 詳細ビュー（リスト形式）
-                imageRect = new Rect(rect.x - 1, rect.y - 1, rect.height + 2, rect.height + 2);
-            }
-            else
-            {
-                // プロジェクトウィンドウ左ペイン
-                imageRect = new Rect(rect.x + 2, rect.y - 1, rect.height + 2, rect.height + 2);
-            }
-
-            // imageRectの幅・高さが奇数なら+1して偶数に揃える
-            float evenWidth = imageRect.width % 2 == 0 ? imageRect.width : imageRect.width + 1;
-            float evenHeight = imageRect.height % 2 == 0 ? imageRect.height : imageRect.height + 1;
-
-            if (textures.Count == 1)
-            {
-                // 1枚だけなら全体に表示
                 GUI.DrawTexture(imageRect, textures[0]);
+                return;
             }
-            else
+
+            float halfWidth = imageRect.width * 0.5f;
+            float halfHeight = imageRect.height * 0.5f;
+            for (int i = 0; i < 4; i++)
             {
-                // 2～4枚なら4分割して表示、足りない領域は白
-                int halfW = Mathf.FloorToInt(evenWidth / 2f);
-                int halfH = Mathf.FloorToInt(evenHeight / 2f);
-                int rightW = Mathf.RoundToInt(evenWidth) - halfW;
-                int bottomH = Mathf.RoundToInt(evenHeight) - halfH;
-                Rect[] subRects = new Rect[]
-                {
-                    new Rect(imageRect.x, imageRect.y, halfW, halfH), // 左上
-                    new Rect(imageRect.x + halfW, imageRect.y, rightW, halfH), // 右上
-                    new Rect(imageRect.x, imageRect.y + halfH, halfW, bottomH), // 左下
-                    new Rect(imageRect.x + halfW, imageRect.y + halfH, rightW, bottomH), // 右下
-                };
-                for (int i = 0; i < 4; i++)
-                {
-                    if (i < textures.Count)
-                    {
-                        GUI.DrawTexture(subRects[i], textures[i]);
-                    }
-                    else
-                    {
-                        EditorGUI.DrawRect(subRects[i], Color.white);
-                    }
-                }
+                var part = new Rect(imageRect.x + i % 2 * halfWidth, imageRect.y + i / 2 * halfHeight, halfWidth, halfHeight);
+                if (i < textures.Length) GUI.DrawTexture(part, textures[i]);
+                else EditorGUI.DrawRect(part, Color.white);
             }
         }
 
-        // 指定フォルダ以下で除外フォルダをスキップしつつFolderIcon.jpgを最大maxCount枚まで再帰的に探索（最大depth階層）
-        private static List<string> FindFolderIconsRecursive(
-            string root,
-            int currentDepth,
-            int maxDepth,
-            int maxCount
-        )
+        private static Texture2D[] GetTextures(string folderPath, List<string> paths)
         {
-            var result = new List<string>();
-            if (currentDepth >= maxDepth) return result;
-
-            try
+            if (FolderTextureCache.TryGetValue(folderPath, out var cached)) return cached;
+            var result = new List<Texture2D>(paths.Count);
+            foreach (string path in paths)
             {
-                foreach (var dir in Directory.GetDirectories(root))
+                if (!TextureCache.TryGetValue(path, out var texture) || texture == null)
                 {
-                    if (result.Count >= maxCount) break;
-
-                    string folderName = Path.GetFileName(dir);
-                    if (ExcludeFolderService.IsExcludedFolder(folderName)) continue;
-
-                    string iconPath = Path.GetFullPath(Path.Combine(dir, "FolderIcon.jpg"));
-                    if (File.Exists(iconPath)) result.Add(iconPath);
-
-                    if (result.Count >= maxCount) break;
-
-                    // 再帰探索
-                    var found = FindFolderIconsRecursive(dir, currentDepth + 1, maxDepth, maxCount - result.Count);
-                    result.AddRange(found);
+                    texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                    if (texture != null) TextureCache[path] = texture;
                 }
+                if (texture != null) result.Add(texture);
             }
-            catch
-            {
-                // Ignored
-            }
+            cached = result.ToArray();
+            FolderTextureCache[folderPath] = cached;
+            return cached;
+        }
+    }
 
-            return result;
+    internal sealed class FolderIconIndexPostprocessor : AssetPostprocessor
+    {
+        private static void OnPostprocessAllAssets(string[] imported, string[] deleted, string[] moved, string[] movedFrom)
+        {
+            if (ContainsIcon(imported) || ContainsIcon(deleted) || ContainsIcon(moved) || ContainsIcon(movedFrom))
+                FolderIconDrawer.ScheduleIndexRebuild();
         }
 
-        /// <summary>
-        /// ディレクトリかどうかをキャッシュ付きで判定
-        /// </summary>
-        private static bool IsDirectoryCached(string path)
+        private static bool ContainsIcon(IEnumerable<string> paths)
         {
-            if (_directoryCache.TryGetValue(path, out bool isDirectory)) return isDirectory;
-
-            try
-            {
-                isDirectory = Directory.Exists(path) && File.GetAttributes(path).HasFlag(FileAttributes.Directory);
-                _directoryCache[path] = isDirectory;
-                return isDirectory;
-            }
-            catch
-            {
-                _directoryCache[path] = false;
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// アイコンパスをキャッシュ付きで取得
-        /// </summary>
-        private static List<string> GetIconPathsCached(string path)
-        {
-            try
-            {
-                long currentWriteTime = Directory.GetLastWriteTime(path).ToBinary();
-                
-                if (_folderCache.TryGetValue(path, out var cache) && cache.IsValid && cache.LastWriteTime == currentWriteTime)
-                {
-                    return cache.IconPaths;
-                }
-
-                // 自フォルダ内のFolderIcon.jpgを最優先で取得
-                string selfIconPath = Path.GetFullPath(Path.Combine(path, "FolderIcon.jpg"));
-                List<string> iconPaths;
-                
-                if (File.Exists(selfIconPath))
-                {
-                    iconPaths = new List<string> { selfIconPath };
-                }
-                else
-                {
-                    iconPaths = FindFolderIconsRecursive(path, 0, 4, 4);
-                }
-
-                // キャッシュに保存
-                _folderCache[path] = new FolderIconCache
-                {
-                    IconPaths = iconPaths,
-                    LastWriteTime = currentWriteTime,
-                    IsValid = true
-                };
-
-                return iconPaths;
-            }
-            catch
-            {
-                return new List<string>();
-            }
-        }
-
-        /// <summary>
-        /// テクスチャをキャッシュ付きで取得
-        /// </summary>
-        private static List<Texture2D> GetTexturesCached(List<string> iconPaths)
-        {
-            var textures = new List<Texture2D>();
-            
-            foreach (var iconPath in iconPaths)
-            {
-                if (_textureCache.TryGetValue(iconPath, out var cachedTexture) && cachedTexture != null)
-                {
-                    textures.Add(cachedTexture);
-                }
-                else
-                {
-                    // フルパス -> プロジェクト相対パス ("Assets/...") に変換
-                    string assetPath = null;
-                    try
-                    {
-                        if (string.IsNullOrEmpty(iconPath)) continue;
-                        string normalized = iconPath.Replace('\\', '/');
-                        string dataPath = Application.dataPath.Replace('\\', '/').TrimEnd('/');
-                        if (normalized.StartsWith(dataPath, StringComparison.OrdinalIgnoreCase))
-                        {
-                            assetPath = "Assets" + normalized.Substring(dataPath.Length);
-                        }
-                        else
-                        {
-                            // 既に "Assets/..." の形式で渡されている場合はそのまま使う
-                            if (normalized.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase) >= 0)
-                            {
-                                int idx = normalized.IndexOf("/Assets/", StringComparison.OrdinalIgnoreCase);
-                                assetPath = normalized.Substring(idx + 1); // remove leading '/'
-                            }
-                            else if (normalized.StartsWith("Assets/", StringComparison.OrdinalIgnoreCase))
-                            {
-                                assetPath = normalized;
-                            }
-                            else
-                            {
-                                // プロジェクト外パスなどはスキップ
-                                assetPath = null;
-                            }
-                        }
-                    }
-                    catch
-                    {
-                        assetPath = null;
-                    }
-
-                    if (string.IsNullOrEmpty(assetPath)) continue;
-
-                    var texture = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
-                    if (texture != null)
-                    {
-                        _textureCache[iconPath] = texture;
-                        textures.Add(texture);
-                    }
-                }
-            }
-            
-            return textures;
-        }
-
-        /// <summary>
-        /// 定期的なキャッシュクリーンアップ
-        /// </summary>
-        private static void CleanupCacheIfNeeded()
-        {
-            _cacheAccessCounter++;
-            
-            // 1000フレームごとにクリーンアップ
-            if (_cacheAccessCounter % 1000 == 0)
-            {
-                CleanupCache();
-            }
-        }
-
-        /// <summary>
-        /// キャッシュのクリーンアップ
-        /// </summary>
-        private static void CleanupCache()
-        {
-            // テクスチャキャッシュが上限を超えた場合、半分をクリア
-            if (_textureCache.Count > MAX_CACHE_SIZE)
-            {
-                Helper.DebugLogger.Log($"Cleaning up texture cache (Count: {_textureCache.Count})");
-                var keysToRemove = _textureCache.Keys.Take(_textureCache.Count / 2).ToList();
-                foreach (var key in keysToRemove)
-                {
-                    _textureCache.Remove(key);
-                }
-            }
-
-            // フォルダキャッシュも同様にクリーンアップ
-            if (_folderCache.Count > MAX_CACHE_SIZE)
-            {
-                Helper.DebugLogger.Log($"Cleaning up folder cache (Count: {_folderCache.Count})");
-                var keysToRemove = _folderCache.Keys.Take(_folderCache.Count / 2).ToList();
-                foreach (var key in keysToRemove)
-                {
-                    _folderCache.Remove(key);
-                }
-            }
-
-            // ディレクトリキャッシュも同様にクリーンアップ
-            if (_directoryCache.Count > MAX_CACHE_SIZE)
-            {
-                Helper.DebugLogger.Log($"Cleaning up directory cache (Count: {_directoryCache.Count})");
-                var keysToRemove = _directoryCache.Keys.Take(_directoryCache.Count / 2).ToList();
-                foreach (var key in keysToRemove)
-                {
-                    _directoryCache.Remove(key);
-                }
-            }
-        }
-
-        [Serializable]
-        private class ExcludeFoldersData
-        {
-            public List<string> Folders = new List<string>();
+            foreach (string path in paths)
+                if (string.Equals(Path.GetFileName(path), "FolderIcon.jpg", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
         }
     }
 }

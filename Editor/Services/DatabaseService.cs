@@ -11,6 +11,7 @@ using System.IO;
 using UnityEngine;
 using UnityEditor;
 using UnityEditorAssetBrowser.Helper;
+using UnityEditorAssetBrowser.Interfaces;
 using UnityEditorAssetBrowser.Models;
 using UnityEditorAssetBrowser.ViewModels;
 
@@ -113,6 +114,11 @@ namespace UnityEditorAssetBrowser.Services
         /// KonoAssetのその他アセットデータベース
         /// </summary>
         private static KonoAssetOtherAssetsDatabase? _kaOtherAssetsDatabase;
+        private static UnifiedKonoAssetDatabase? _unifiedKADatabase;
+        private static readonly Dictionary<int, IDatabaseItem> ItemsByBoothId = new Dictionary<int, IDatabaseItem>();
+        private static readonly Dictionary<string, IDatabaseItem> ItemsByImagePath = new Dictionary<string, IDatabaseItem>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, IDatabaseItem> ItemsByImageName = new Dictionary<string, IDatabaseItem>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, BOOTHLMItem> BOOTHLMItemsByRegisteredId = new Dictionary<string, BOOTHLMItem>(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// BOOTHLMのデータベース
@@ -325,6 +331,7 @@ namespace UnityEditorAssetBrowser.Services
 
         private static void UpdateViewModels()
         {
+            RebuildDatabaseCaches();
             if (
                 _assetBrowserViewModel != null
                 && _searchViewModel != null
@@ -341,6 +348,72 @@ namespace UnityEditorAssetBrowser.Services
                 );
                 _searchViewModel.SetCurrentTab(_paginationViewModel.SelectedTab);
             }
+        }
+
+        private static void RebuildDatabaseCaches()
+        {
+            _unifiedKADatabase = null;
+            ItemsByBoothId.Clear();
+            ItemsByImagePath.Clear();
+            ItemsByImageName.Clear();
+            BOOTHLMItemsByRegisteredId.Clear();
+
+            if (_kaAvatarsDatabase != null || _kaWearablesDatabase != null ||
+                _kaWorldObjectsDatabase != null || _kaOtherAssetsDatabase != null)
+            {
+                _unifiedKADatabase = new UnifiedKonoAssetDatabase();
+                if (_kaAvatarsDatabase != null) _unifiedKADatabase.Items.AddRange(_kaAvatarsDatabase.Data);
+                if (_kaWearablesDatabase != null) _unifiedKADatabase.Items.AddRange(_kaWearablesDatabase.Data);
+                if (_kaWorldObjectsDatabase != null) _unifiedKADatabase.Items.AddRange(_kaWorldObjectsDatabase.Data);
+                if (_kaOtherAssetsDatabase != null) _unifiedKADatabase.Items.AddRange(_kaOtherAssetsDatabase.Data);
+            }
+
+            IndexItems(_aeDatabase?.Items);
+            IndexItems(_unifiedKADatabase?.Items);
+            IndexItems(_boothlmDatabase?.Items);
+
+            if (_boothlmDatabase != null)
+                foreach (var item in _boothlmDatabase.Items)
+                    if (!string.IsNullOrEmpty(item.RegisteredId)) BOOTHLMItemsByRegisteredId[item.RegisteredId] = item;
+        }
+
+        private static void IndexItems<T>(IEnumerable<T>? items) where T : IDatabaseItem
+        {
+            if (items == null) return;
+            foreach (var item in items)
+            {
+                int boothId = item.GetBoothId();
+                if (boothId > 0 && !ItemsByBoothId.ContainsKey(boothId)) ItemsByBoothId[boothId] = item;
+
+                string imagePath = item.GetImagePath();
+                if (string.IsNullOrEmpty(imagePath)) continue;
+                string normalized = NormalizeIndexPath(imagePath);
+                if (!ItemsByImagePath.ContainsKey(normalized)) ItemsByImagePath[normalized] = item;
+                string imageName = Path.GetFileNameWithoutExtension(imagePath);
+                if (!string.IsNullOrEmpty(imageName) && !ItemsByImageName.ContainsKey(imageName)) ItemsByImageName[imageName] = item;
+            }
+        }
+
+        private static string NormalizeIndexPath(string path)
+        {
+            if (path.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return path;
+            try { return Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar); }
+            catch { return path; }
+        }
+
+        public static IDatabaseItem? FindItemByBoothId(int boothId)
+            => ItemsByBoothId.TryGetValue(boothId, out var item) ? item : null;
+
+        public static IDatabaseItem? FindItemByImagePath(string path)
+            => ItemsByImagePath.TryGetValue(NormalizeIndexPath(path), out var item) ? item : null;
+
+        public static IDatabaseItem? FindItemByImageName(string namePart)
+        {
+            if (ItemsByImageName.TryGetValue(namePart, out var exact)) return exact;
+            foreach (var pair in ItemsByImageName)
+                if (pair.Key.IndexOf(namePart, StringComparison.OrdinalIgnoreCase) >= 0) return pair.Value;
+            return null;
         }
 
         /// <summary>
@@ -722,18 +795,7 @@ namespace UnityEditorAssetBrowser.Services
         /// <returns>統合データベース（全てのデータベースが存在しない場合はnull）</returns>
         public static UnifiedKonoAssetDatabase? GetKADatabase()
         {
-            if (_kaAvatarsDatabase == null && _kaWearablesDatabase == null && _kaWorldObjectsDatabase == null && _kaOtherAssetsDatabase == null)
-            {
-                return null;
-            }
-
-            var unified = new UnifiedKonoAssetDatabase();
-            if (_kaAvatarsDatabase != null) unified.Items.AddRange(_kaAvatarsDatabase.Data);
-            if (_kaWearablesDatabase != null) unified.Items.AddRange(_kaWearablesDatabase.Data);
-            if (_kaWorldObjectsDatabase != null) unified.Items.AddRange(_kaWorldObjectsDatabase.Data);
-            if (_kaOtherAssetsDatabase != null) unified.Items.AddRange(_kaOtherAssetsDatabase.Data);
-            
-            return unified;
+            return _unifiedKADatabase;
         }
 
         /// <summary>
@@ -755,8 +817,10 @@ namespace UnityEditorAssetBrowser.Services
             if (database == null) return new List<BOOTHLMItem>();
 
             // IDリストに含まれるアイテムを抽出
-            var idSet = new HashSet<string>(ids);
-            return database.Items.Where(i => idSet.Contains(i.RegisteredId)).ToList();
+            var result = new List<BOOTHLMItem>(ids.Count);
+            foreach (string id in ids)
+                if (BOOTHLMItemsByRegisteredId.TryGetValue(id, out var item)) result.Add(item);
+            return result;
         }
 
         public static (int TotalCount, List<BOOTHLMItem> PreviewItems) GetPreviewItemsForBOOTHLMList(BOOTHLMList list, int count = 5)
@@ -772,15 +836,10 @@ namespace UnityEditorAssetBrowser.Services
             if (database == null) return (0, new List<BOOTHLMItem>());
 
             // IDリストに含まれるアイテムを抽出
-            var idSet = new HashSet<string>(previewIds);
-            var items = database.Items.Where(i => idSet.Contains(i.RegisteredId)).ToList();
-            
-            // 取得順序を維持するために並び替え
-            var orderedItems = new List<BOOTHLMItem>();
+            var orderedItems = new List<BOOTHLMItem>(previewIds.Count);
             foreach (var id in previewIds)
             {
-                var item = items.FirstOrDefault(i => i.RegisteredId == id);
-                if (item != null) orderedItems.Add(item);
+                if (BOOTHLMItemsByRegisteredId.TryGetValue(id, out var item)) orderedItems.Add(item);
             }
             
             return (totalCount, orderedItems);
@@ -791,7 +850,10 @@ namespace UnityEditorAssetBrowser.Services
         /// AvatarExplorerデータベースをクリアする
         /// </summary>
         public static void ClearAEDatabase()
-            => _aeDatabase = null;
+        {
+            _aeDatabase = null;
+            RebuildDatabaseCaches();
+        }
 
         /// <summary>
         /// KonoAssetデータベースをクリアする
@@ -802,12 +864,16 @@ namespace UnityEditorAssetBrowser.Services
             _kaWearablesDatabase = null;
             _kaWorldObjectsDatabase = null;
             _kaOtherAssetsDatabase = null;
+            RebuildDatabaseCaches();
         }
 
         /// <summary>
         /// BOOTHLMデータベースをクリアする
         /// </summary>
         public static void ClearBOOTHLMDatabase()
-            => _boothlmDatabase = null;
+        {
+            _boothlmDatabase = null;
+            RebuildDatabaseCaches();
+        }
     }
 }

@@ -88,6 +88,18 @@ namespace UnityEditorAssetBrowser.Helper
                 );
 
                 var v2Items = (v2Database.Items ?? new List<AvatarExplorerV2Item>()).ToArray();
+                var itemsById = v2Items
+                    .Where(x => !string.IsNullOrEmpty(x.Id))
+                    .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+                var tempAvatarsById = tempAvatarDefinitions
+                    .Where(x => !string.IsNullOrEmpty(x.Id))
+                    .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
+                var commonAvatarsById = commonAvatarDefinitions
+                    .Where(x => !string.IsNullOrEmpty(x.Id))
+                    .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(x => x.Key, x => x.First(), StringComparer.OrdinalIgnoreCase);
                 DebugLogger.Log($"Loaded {v2Items.Length} items from AEV2 database.");
 
                 foreach (var item in v2Items)
@@ -97,10 +109,10 @@ namespace UnityEditorAssetBrowser.Helper
                     item.Category ??= new AvatarExplorerV2Category();
                     item.Category.Type = NormalizeItemType(item.Category.Type);
                     item.SupportedAvatars = MergeSupportedAvatarsWithCommon(
-                        v2Items,
                         item.SupportedAvatars ?? Array.Empty<string>(),
-                        commonAvatarDefinitions,
-                        tempAvatarDefinitions
+                        itemsById,
+                        commonAvatarsById,
+                        tempAvatarsById
                     );
                 }
 
@@ -142,9 +154,9 @@ namespace UnityEditorAssetBrowser.Helper
         }
 
         private static string[] ConvertSupportedAvatarIds(
-            AvatarExplorerV2Item[] items,
             string[] supportedAvatarReferences,
-            IReadOnlyList<TempAvatarV2Definition> tempAvatars
+            IReadOnlyDictionary<string, AvatarExplorerV2Item> items,
+            IReadOnlyDictionary<string, TempAvatarV2Definition> tempAvatars
         )
         {
             var supportedAvatarNames = new List<string>();
@@ -159,8 +171,8 @@ namespace UnityEditorAssetBrowser.Helper
         }
 
         private static bool TryGetAvatarTitle(
-            AvatarExplorerV2Item[] items,
-            IReadOnlyList<TempAvatarV2Definition> tempAvatars,
+            IReadOnlyDictionary<string, AvatarExplorerV2Item> items,
+            IReadOnlyDictionary<string, TempAvatarV2Definition> tempAvatars,
             string avatarReference,
             out string title
         )
@@ -170,10 +182,7 @@ namespace UnityEditorAssetBrowser.Helper
             if (avatarReference.StartsWith(TempAvatarPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 var tempId = avatarReference[TempAvatarPrefix.Length..];
-                var tempData = tempAvatars.FirstOrDefault(x =>
-                    string.Equals(x.Id, tempId, StringComparison.OrdinalIgnoreCase)
-                );
-                if (tempData != null && !string.IsNullOrEmpty(tempData.AvatarName))
+                if (tempAvatars.TryGetValue(tempId, out var tempData) && !string.IsNullOrEmpty(tempData.AvatarName))
                 {
                     title = tempData.AvatarName;
                     return true;
@@ -186,10 +195,7 @@ namespace UnityEditorAssetBrowser.Helper
                 return false;
 
             var itemId = avatarReference[ItemPrefix.Length..];
-            var avatarData = items.FirstOrDefault(x =>
-                string.Equals(x.Id, itemId, StringComparison.OrdinalIgnoreCase)
-            );
-            if (avatarData != null && !string.IsNullOrEmpty(avatarData.Title))
+            if (items.TryGetValue(itemId, out var avatarData) && !string.IsNullOrEmpty(avatarData.Title))
             {
                 title = avatarData.Title;
                 return true;
@@ -199,14 +205,14 @@ namespace UnityEditorAssetBrowser.Helper
         }
 
         private static string[] MergeSupportedAvatarsWithCommon(
-            AvatarExplorerV2Item[] items,
             string[] supportedAvatars,
-            IReadOnlyList<CommonAvatarV2Definition> commonDefinitions,
-            IReadOnlyList<TempAvatarV2Definition> tempAvatars
+            IReadOnlyDictionary<string, AvatarExplorerV2Item> items,
+            IReadOnlyDictionary<string, CommonAvatarV2Definition> commonDefinitions,
+            IReadOnlyDictionary<string, TempAvatarV2Definition> tempAvatars
         )
         {
             if (commonDefinitions.Count == 0)
-                return ConvertSupportedAvatarIds(items, supportedAvatars, tempAvatars);
+                return ConvertSupportedAvatarIds(supportedAvatars, items, tempAvatars);
 
             var merged = new List<string>();
             var emittedCommonAvatarIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -219,10 +225,8 @@ namespace UnityEditorAssetBrowser.Helper
                     if (!emittedCommonAvatarIds.Add(commonAvatarId))
                         continue;
 
-                    var definition = commonDefinitions.FirstOrDefault(x =>
-                        string.Equals(x.Id, commonAvatarId, StringComparison.OrdinalIgnoreCase)
-                    );
-                    if (definition == null || definition.Avatars == null || definition.Avatars.Count == 0)
+                    if (!commonDefinitions.TryGetValue(commonAvatarId, out var definition) ||
+                        definition.Avatars == null || definition.Avatars.Count == 0)
                         continue;
 
                     var titles = new List<string>();

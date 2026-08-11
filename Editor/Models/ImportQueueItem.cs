@@ -2,6 +2,8 @@
 
 #nullable enable
 
+using UnityEditorAssetBrowser.Interfaces;
+
 namespace UnityEditorAssetBrowser.Models
 {
     /// <summary>
@@ -29,5 +31,10 @@ namespace UnityEditorAssetBrowser.Models
         /// カテゴリ
         /// </summary>
         public string Category { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 更新確認に使用するデータベースアイテム
+        /// </summary>
+        public IDatabaseItem? DatabaseItem { get; set; }
     }
 }

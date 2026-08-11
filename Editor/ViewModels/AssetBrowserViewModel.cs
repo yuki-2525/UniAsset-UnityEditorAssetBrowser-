@@ -40,6 +40,8 @@ namespace UnityEditorAssetBrowser.ViewModels
         private SortMethod _currentSortMethod = SortMethod.CreatedDateDesc;
         private readonly SearchViewModel _searchViewModel;
         private string? _lastError;
+        private readonly Dictionary<string, int> _aeAssetTypeCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, int> _boothlmAssetTypeCache = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         private BOOTHLMList? _currentList;
         public BOOTHLMList? CurrentList
@@ -121,20 +123,47 @@ namespace UnityEditorAssetBrowser.ViewModels
         /// </summary>
         private int GetBOOTHLMAssetType(string category)
         {
+            if (_boothlmAssetTypeCache.TryGetValue(category, out int cachedType)) return cachedType;
             var key = "UnityEditorAssetBrowser_BOOTHLMCategoryAssetType_" + category;
             if (EditorPrefs.HasKey(key))
             {
-                return EditorPrefs.GetInt(key);
+                cachedType = EditorPrefs.GetInt(key);
+                _boothlmAssetTypeCache[category] = cachedType;
+                return cachedType;
             }
 
             // デフォルトの判定ロジック
             if (category.Contains("3D Characters") || category.Contains("3Dキャラクター") || category.Contains("Avatar") || category.Contains("アバター"))
-                return (int)AssetTypeConstants.Avatar;
-            if (category.Contains("3D Costumes") || category.Contains("3D衣装") || category.Contains("3D Accessories") || category.Contains("3D装飾品") || category.Contains("Fashion") || category.Contains("ファッション"))
-                return (int)AssetTypeConstants.AvatarRelated;
-            if (category.Contains("3D Environments") || category.Contains("3D環境") || category.Contains("World") || category.Contains("ワールド"))
-                return (int)AssetTypeConstants.World;
-            return (int)AssetTypeConstants.Other;
+                cachedType = (int)AssetTypeConstants.Avatar;
+            else if (category.Contains("3D Costumes") || category.Contains("3D衣装") || category.Contains("3D Accessories") || category.Contains("3D装飾品") || category.Contains("Fashion") || category.Contains("ファッション"))
+                cachedType = (int)AssetTypeConstants.AvatarRelated;
+            else if (category.Contains("3D Environments") || category.Contains("3D環境") || category.Contains("World") || category.Contains("ワールド"))
+                cachedType = (int)AssetTypeConstants.World;
+            else cachedType = (int)AssetTypeConstants.Other;
+            _boothlmAssetTypeCache[category] = cachedType;
+            return cachedType;
+        }
+
+        private int GetAEAssetType(AvatarExplorerItem item)
+        {
+            string category = item.GetAECategoryName();
+            if (_aeAssetTypeCache.TryGetValue(category, out int cachedType)) return cachedType;
+            string key = "UnityEditorAssetBrowser_CategoryAssetType_" + category;
+            cachedType = EditorPrefs.HasKey(key)
+                ? EditorPrefs.GetInt(key)
+                : (AvatarExplorerItemType)item.Type == AvatarExplorerItemType.Avatar
+                    ? (int)AssetTypeConstants.Avatar
+                    : AssetItem.IsWorldCategory(item.CustomCategory)
+                        ? (int)AssetTypeConstants.World
+                        : (int)AssetTypeConstants.AvatarRelated;
+            _aeAssetTypeCache[category] = cachedType;
+            return cachedType;
+        }
+
+        public void InvalidateCategoryAssetTypeCache()
+        {
+            _aeAssetTypeCache.Clear();
+            _boothlmAssetTypeCache.Clear();
         }
 
         /// <summary>
@@ -149,16 +178,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             if (_aeDatabase?.Items != null)
             {
                 items.AddRange(
-                    _aeDatabase.Items.Where(item =>
-                    {
-                        var category = item.GetAECategoryName();
-                        var key = "UnityEditorAssetBrowser_CategoryAssetType_" + category;
-
-                        // アセットタイプが0（アバター）のアイテムのみを表示
-                        if (EditorPrefs.HasKey(key)) return EditorPrefs.GetInt(key) == (int)AssetTypeConstants.Avatar;
-
-                        return (AvatarExplorerItemType)item.Type == AvatarExplorerItemType.Avatar; // キーが存在しない場合は従来の判定
-                    })
+                    _aeDatabase.Items.Where(item => GetAEAssetType(item) == (int)AssetTypeConstants.Avatar)
                 );
             }
 
@@ -191,17 +211,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             if (_aeDatabase != null)
             {
                 items.AddRange(
-                    _aeDatabase.Items.Where(item =>
-                    {
-                        var category = item.GetAECategoryName();
-                        var key = "UnityEditorAssetBrowser_CategoryAssetType_" + category;
-
-                        // アセットタイプが1（アバター関連アセット）のアイテムのみを表示
-                        if (EditorPrefs.HasKey(key)) return EditorPrefs.GetInt(key) == (int)AssetTypeConstants.AvatarRelated;
-
-                        // キーが存在しない場合は従来の判定
-                        return (AvatarExplorerItemType)item.Type != AvatarExplorerItemType.Avatar && !AssetItem.IsWorldCategory(item.CustomCategory);
-                    })
+                    _aeDatabase.Items.Where(item => GetAEAssetType(item) == (int)AssetTypeConstants.AvatarRelated)
                 );
             }
             
@@ -236,17 +246,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             if (_aeDatabase?.Items != null)
             {
                 items.AddRange(
-                    _aeDatabase.Items.Where(item =>
-                    {
-                        var category = item.GetAECategoryName();
-                        var key = "UnityEditorAssetBrowser_CategoryAssetType_" + category;
-
-                        // アセットタイプが2（ワールドオブジェクト）のアイテムのみを表示
-                        if (EditorPrefs.HasKey(key)) return EditorPrefs.GetInt(key) == (int)AssetTypeConstants.World;
-
-                        // キーが存在しない場合は従来の判定
-                        return (AvatarExplorerItemType)item.Type != AvatarExplorerItemType.Avatar && AssetItem.IsWorldCategory(item.CustomCategory);
-                    })
+                    _aeDatabase.Items.Where(item => GetAEAssetType(item) == (int)AssetTypeConstants.World)
                 );
             }
 
@@ -319,18 +319,7 @@ namespace UnityEditorAssetBrowser.ViewModels
             {
                 foreach (var item in _aeDatabase.Items)
                 {
-                    var category = item.GetAECategoryName();
-                    var key = "UnityEditorAssetBrowser_CategoryAssetType_" + category;
-
-                    // 設定されたアセットタイプに基づいてフィルタリング
-                    if (EditorPrefs.HasKey(key))
-                    {
-                        var assetType = EditorPrefs.GetInt(key);
-                        if (assetType == (int)AssetTypeConstants.Other) // その他
-                        {
-                            items.Add(item);
-                        }
-                    }
+                    if (GetAEAssetType(item) == (int)AssetTypeConstants.Other) items.Add(item);
                 }
             }
 
@@ -452,6 +441,7 @@ namespace UnityEditorAssetBrowser.ViewModels
         {
             DebugLogger.Log("UpdateDatabases called");
             ClearListPreviewCache();
+            InvalidateCategoryAssetTypeCache();
             // データベースがnullの場合は、即座に更新を完了
             if (
                 aeDatabase == null
