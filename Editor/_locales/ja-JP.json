@@ -7,6 +7,7 @@
   "open_product_page": "商品ページを開く",
   "booth_update_available_title": "商品データの更新確認",
   "booth_update_available_message": "以下のバリエーションで更新がある可能性があります。\n{0}\n\nそのままインポートしますか？",
+  "booth_update_available_unknown_variation_message": "このアイテムに更新がある可能性があります。 そのままインポートしますか？",
   "yes": "はい",
   "open_explorer": "Explorerで開く",
   "open_default_application": "既定のアプリで開く",

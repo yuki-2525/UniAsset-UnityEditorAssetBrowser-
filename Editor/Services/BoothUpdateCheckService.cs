@@ -36,6 +36,7 @@ namespace UnityEditorAssetBrowser.Services
             public Dictionary<string, string> VariationNames { get; set; } = new Dictionary<string, string>();
             public Dictionary<string, DateTimeOffset?> VariationUpdatedAt { get; set; } =
                 new Dictionary<string, DateTimeOffset?>();
+            public bool HasUnnamedVariation { get; set; }
             public DateTimeOffset? UpdatedAt { get; set; }
         }
 
@@ -122,13 +123,17 @@ namespace UnityEditorAssetBrowser.Services
                     $"BOOTH update check found possible changes: boothId={boothId}, " +
                     $"variationIds={string.Join(",", remoteResult.UpdatedVariationIds)}");
 
-                string variationText = string.Join("\n", remoteResult.UpdatedVariationIds.Select(id =>
-                    $"・{GetVariationDisplayName(remoteResult.Snapshot, id)}"));
+                bool useGenericMessage = remoteResult.Snapshot.Variations.Count == 1 &&
+                    remoteResult.Snapshot.HasUnnamedVariation;
+                string message = useGenericMessage
+                    ? LocalizationService.Instance.GetString("booth_update_available_unknown_variation_message")
+                    : string.Format(
+                        LocalizationService.Instance.GetString("booth_update_available_message"),
+                        string.Join("\n", remoteResult.UpdatedVariationIds.Select(id =>
+                            $"・{GetVariationDisplayName(remoteResult.Snapshot, id)}")));
                 int result = EditorUtility.DisplayDialogComplex(
                     LocalizationService.Instance.GetString("booth_update_available_title"),
-                    string.Format(
-                        LocalizationService.Instance.GetString("booth_update_available_message"),
-                        variationText),
+                    message,
                     LocalizationService.Instance.GetString("yes"),
                     LocalizationService.Instance.GetString("cancel"),
                     LocalizationService.Instance.GetString("open_product_page"));
@@ -228,7 +233,11 @@ namespace UnityEditorAssetBrowser.Services
                 if (string.IsNullOrEmpty(variationId) || string.IsNullOrEmpty(hash)) continue;
 
                 snapshot.Variations[variationId] = hash;
-                string variationName = GetTokenText(GetProperty(variation, "VariationName", "variationName", "name", "Name") ?? idToken);
+                var variationNameToken = GetProperty(variation, "VariationName", "variationName", "name", "Name");
+                string variationName = variationNameToken == null || variationNameToken.Type == JTokenType.Null
+                    ? string.Empty
+                    : GetTokenText(variationNameToken);
+                if (string.IsNullOrEmpty(variationName)) snapshot.HasUnnamedVariation = true;
                 snapshot.VariationNames[variationId] = string.IsNullOrEmpty(variationName) ? variationId : variationName;
                 var variationDate = ParseDate(GetProperty(
                     variation,
