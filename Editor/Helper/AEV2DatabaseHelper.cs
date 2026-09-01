@@ -20,10 +20,16 @@ namespace UnityEditorAssetBrowser.Helper
     /// </summary>
     public sealed class AEV2DatabaseVersionMismatchException : Exception
     {
-        public AEV2DatabaseVersionMismatchException()
-            : base(AEV2DatabaseHelper.VersionMismatchMessage)
+        public AEV2DatabaseVersionMismatchException(int? databaseVersion, int supportedVersion)
+            : base(CreateMessage(databaseVersion, supportedVersion))
         {
         }
+
+        private static string CreateMessage(int? databaseVersion, int supportedVersion)
+            => $"Avatar Explorer V2のデータベースバージョンが一致しません。\n\n"
+                + $"データベースのバージョン: {databaseVersion?.ToString() ?? "不明"}\n"
+                + $"UniAssetの対応バージョン: {supportedVersion}\n\n"
+                + "Avatar ExplorerとUniAssetを最新版にアップデートしてください。";
     }
 
     /// <summary>
@@ -31,9 +37,7 @@ namespace UnityEditorAssetBrowser.Helper
     /// </summary>
     public static class AEV2DatabaseHelper
     {
-        public const string VersionMismatchMessage = "ゆにあせとAvatarExplorerを最新版にアップデートしてください";
-
-        private const int SupportedItemsVersion = 3;
+        private const int SupportedItemsVersion = 4;
         private const int SupportedCommonAvatarVersion = 1;
         private const int SupportedTempAvatarVersion = 0;
         private const int ItemTypeMigrationOffset = 1;
@@ -140,15 +144,18 @@ namespace UnityEditorAssetBrowser.Helper
         {
             var root = JToken.Parse(File.ReadAllText(filePath)) as JObject;
             if (root == null || root["Items"] is not JArray)
-                throw new AEV2DatabaseVersionMismatchException();
+                throw new AEV2DatabaseVersionMismatchException(null, supportedVersion);
 
-            var version = root["Version"];
-            if (version == null || version.Type != JTokenType.Integer || version.Value<int>() != supportedVersion)
-                throw new AEV2DatabaseVersionMismatchException();
+            var versionToken = root["Version"];
+            int? databaseVersion = versionToken != null && versionToken.Type == JTokenType.Integer
+                ? versionToken.Value<int>()
+                : null;
+            if (databaseVersion != supportedVersion)
+                throw new AEV2DatabaseVersionMismatchException(databaseVersion, supportedVersion);
 
             var database = root.ToObject<T>(JsonSerializer.Create(settings));
             if (database == null)
-                throw new AEV2DatabaseVersionMismatchException();
+                throw new AEV2DatabaseVersionMismatchException(databaseVersion, supportedVersion);
 
             return database;
         }

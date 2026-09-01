@@ -240,21 +240,7 @@ namespace UnityEditorAssetBrowser.Models
         }
 
         private static string ResolveItemPath(string itemPath)
-        {
-            try
-            {
-                if (itemPath.StartsWith("Datas\\"))
-                {
-                    return Path.GetFullPath(Path.Combine(DatabaseService.GetAEDatabasePath(), itemPath.Replace("Datas\\", "")));
-                }
-
-                return Path.GetFullPath(itemPath);
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
+            => DatabaseService.ResolveAEPath(itemPath);
         public string GetImagePath()
         {
             string databaseRoot = DatabaseService.GetAEDatabasePath();
