@@ -140,13 +140,14 @@ namespace UnityEditorAssetBrowser.Models
         public string GetTitle() => Title;
         public string GetAuthor() => Author;
         public string GetMemo() => ItemMemo;
-        public string GetItemPath() => Path.GetFullPath(ItemPath);
+        public string GetItemPath() => DatabaseService.ResolveAEPath(ItemPath);
         public string[] GetItemPaths()
         {
             return new[] { ItemPath }
                 .Concat(ItemPaths ?? Array.Empty<string>())
                 .Where(x => !string.IsNullOrEmpty(x))
-                .Select(Path.GetFullPath)
+                .Select(DatabaseService.ResolveAEPath)
+                .Where(x => !string.IsNullOrEmpty(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToArray();
         }
@@ -202,7 +203,7 @@ namespace UnityEditorAssetBrowser.Models
                 ItemMemo = ItemMemo,
                 ItemPath = resolvedItemPath,
                 ItemPaths = (ItemPaths ?? Array.Empty<string>())
-                    .Select(path => TryResolvePath(() => Path.GetFullPath(path), string.Empty))
+                    .Select(path => DatabaseService.ResolveAEPath(path))
                     .Where(path => !string.IsNullOrEmpty(path))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToArray(),

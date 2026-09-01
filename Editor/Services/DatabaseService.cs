@@ -238,11 +238,8 @@ namespace UnityEditorAssetBrowser.Services
                 }
                 catch (AEV2DatabaseVersionMismatchException ex)
                 {
+                    DebugLogger.LogError(ex.Message);
                     OnAEDatabasePathChanged("");
-                    ShowErrorDialog(
-                        LocalizationService.Instance.GetString("error_path_title"),
-                        ex.Message
-                    );
                     return;
                 }
 
@@ -522,6 +519,43 @@ namespace UnityEditorAssetBrowser.Services
         /// AvatarExplorerのデータルートパスを取得する
         /// </summary>
         public static string GetAEDataRootPath() => _aeDataRootPath;
+
+        /// <summary>
+        /// Avatar Explorerのデータベースに保存されたパスを実ファイルパスへ解決する。
+        /// </summary>
+        /// <param name="path">データベースに保存されたパス</param>
+        /// <returns>解決された実ファイルパス。解決できない場合は空文字列</returns>
+        public static string ResolveAEPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+
+            try
+            {
+                const string rootPrefix = "<root>";
+                if (path.Equals(rootPrefix, StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith(rootPrefix + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                    || path.StartsWith(rootPrefix + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.IsNullOrEmpty(_aeDataRootPath)) return string.Empty;
+
+                    var relativePath = path.Substring(rootPrefix.Length)
+                        .TrimStart(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    return Path.GetFullPath(Path.Combine(_aeDataRootPath, relativePath));
+                }
+
+                const string databasePrefix = "Datas\\";
+                if (path.StartsWith(databasePrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Path.GetFullPath(Path.Combine(GetAEDatabasePath(), path.Substring(databasePrefix.Length)));
+                }
+
+                return Path.GetFullPath(path);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
 
         /// <summary>
         /// AvatarExplorerのデータルートパスを設定する
